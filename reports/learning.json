@@ -1,0 +1,870 @@
+{
+  "absolute_changes": {
+    "category_accuracy": 0.4,
+    "category_macro_f1": 0.47111111111111115,
+    "priority_accuracy": 0.5,
+    "priority_macro_f1": 0.39682539682539686
+  },
+  "baseline": {
+    "category_accuracy": 0.5,
+    "category_confusion_matrix": [
+      [
+        0,
+        0,
+        0,
+        0,
+        2
+      ],
+      [
+        0,
+        0,
+        0,
+        0,
+        2
+      ],
+      [
+        0,
+        0,
+        1,
+        0,
+        1
+      ],
+      [
+        0,
+        0,
+        0,
+        2,
+        0
+      ],
+      [
+        0,
+        0,
+        0,
+        0,
+        2
+      ]
+    ],
+    "category_labels": [
+      "job opportunities",
+      "university",
+      "bills",
+      "promotions",
+      "spam"
+    ],
+    "category_macro_f1": 0.42222222222222217,
+    "priority_accuracy": 0.3,
+    "priority_confusion_matrix": [
+      [
+        2,
+        0,
+        0
+      ],
+      [
+        0,
+        0,
+        2
+      ],
+      [
+        5,
+        0,
+        1
+      ]
+    ],
+    "priority_labels": [
+      "low",
+      "normal",
+      "high"
+    ],
+    "priority_macro_f1": 0.2222222222222222,
+    "rows": 10
+  },
+  "data_type": "Synthetic demonstration data; not a real-world accuracy estimate.",
+  "dependencies": {
+    "joblib": "1.6.0",
+    "numpy": "2.5.3",
+    "pandas": "2.3.3",
+    "pytest": "9.1.1",
+    "python": "3.12.9",
+    "scikit-learn": "1.9.1",
+    "scipy": "1.18.1",
+    "streamlit": "1.63.0",
+    "threadpoolctl": "3.6.0"
+  },
+  "heldout_hash": "b2d79a373efe2dfc45022b251c78e45eb28eb819edb144b23201a0019915db08",
+  "inbox_preview": {
+    "category_changed": 3,
+    "changed": 4,
+    "priority_changed": 3,
+    "rows": [
+      {
+        "after_category": "job opportunities",
+        "after_category_confidence": 0.8038865238099699,
+        "after_priority": "high",
+        "after_priority_confidence": 0.9345169267398169,
+        "after_training_member": true,
+        "before_category": "spam",
+        "before_category_confidence": 0.5889219806757477,
+        "before_priority": "high",
+        "before_priority_confidence": 0.5227345456598492,
+        "before_training_member": false,
+        "category_changed": true,
+        "changed": true,
+        "human_category": "job opportunities",
+        "human_priority": "high",
+        "id": 1,
+        "priority_changed": false,
+        "subject": "Interview moved to Tuesday"
+      },
+      {
+        "after_category": "university",
+        "after_category_confidence": 0.7585135821680019,
+        "after_priority": "normal",
+        "after_priority_confidence": 0.9607155469602727,
+        "after_training_member": true,
+        "before_category": "spam",
+        "before_category_confidence": 0.5654534424108312,
+        "before_priority": "low",
+        "before_priority_confidence": 0.5957457995761505,
+        "before_training_member": false,
+        "category_changed": true,
+        "changed": true,
+        "human_category": "university",
+        "human_priority": "normal",
+        "id": 2,
+        "priority_changed": true,
+        "subject": "Academic transcript request"
+      },
+      {
+        "after_category": "bills",
+        "after_category_confidence": 0.8379330507594545,
+        "after_priority": "high",
+        "after_priority_confidence": 0.8827533554159567,
+        "after_training_member": true,
+        "before_category": "spam",
+        "before_category_confidence": 0.413882997945895,
+        "before_priority": "low",
+        "before_priority_confidence": 0.4840567954934218,
+        "before_training_member": false,
+        "category_changed": true,
+        "changed": true,
+        "human_category": "bills",
+        "human_priority": "high",
+        "id": 3,
+        "priority_changed": true,
+        "subject": "Rent invoice available"
+      },
+      {
+        "after_category": "promotions",
+        "after_category_confidence": 0.834947125898999,
+        "after_priority": "low",
+        "after_priority_confidence": 0.729540865599696,
+        "after_training_member": true,
+        "before_category": "promotions",
+        "before_category_confidence": 0.5405351736614559,
+        "before_priority": "low",
+        "before_priority_confidence": 0.7433066134974777,
+        "before_training_member": false,
+        "category_changed": false,
+        "changed": false,
+        "human_category": "promotions",
+        "human_priority": "low",
+        "id": 4,
+        "priority_changed": false,
+        "subject": "Subscriber sale alert"
+      },
+      {
+        "after_category": "spam",
+        "after_category_confidence": 0.7803638752461295,
+        "after_priority": "high",
+        "after_priority_confidence": 0.8793034626144866,
+        "after_training_member": true,
+        "before_category": "spam",
+        "before_category_confidence": 0.7313804549118882,
+        "before_priority": "low",
+        "before_priority_confidence": 0.4731153221417577,
+        "before_training_member": false,
+        "category_changed": false,
+        "changed": true,
+        "human_category": "spam",
+        "human_priority": "high",
+        "id": 5,
+        "priority_changed": true,
+        "subject": "Unclaimed inheritance notice"
+      }
+    ],
+    "total": 5
+  },
+  "label_source": "Pre-authored synthetic category/priority labels in demo_feedback.csv, replayed through save_feedback; not predictions or evaluation labels.",
+  "overlap": {
+    "normalization": "Unicode NFKC, casefold and whitespace collapse on subject/body; sender ignored",
+    "pair_counts": {
+      "feedback/eval": 0,
+      "feedback/validation": 0,
+      "seed/eval": 0,
+      "seed/feedback": 0,
+      "seed/validation": 0,
+      "validation/eval": 0
+    }
+  },
+  "probe_predictions": [
+    {
+      "baseline": {
+        "category": "spam",
+        "category_confidence": 0.5889219806757477,
+        "model_version_id": 1,
+        "priority": "high",
+        "priority_confidence": 0.5227345456598492,
+        "status": "needs_review"
+      },
+      "content_hash": "e0808ecf677dac385372449459aa367625c2f510d8d9bea47456833a36249abd",
+      "rollback": {
+        "category": "spam",
+        "category_confidence": 0.5889219806757477,
+        "model_version_id": 1,
+        "priority": "high",
+        "priority_confidence": 0.5227345456598492,
+        "status": "needs_review"
+      },
+      "split": "feedback",
+      "updated": {
+        "category": "job opportunities",
+        "category_confidence": 0.8038865238099699,
+        "model_version_id": 2,
+        "priority": "high",
+        "priority_confidence": 0.9345169267398169,
+        "status": "classified"
+      }
+    },
+    {
+      "baseline": {
+        "category": "spam",
+        "category_confidence": 0.5654534424108312,
+        "model_version_id": 1,
+        "priority": "low",
+        "priority_confidence": 0.5957457995761505,
+        "status": "needs_review"
+      },
+      "content_hash": "0572ced0e1638bd236df5c62803ad79ad47a097a4de19f29ee68164ef187e247",
+      "rollback": {
+        "category": "spam",
+        "category_confidence": 0.5654534424108312,
+        "model_version_id": 1,
+        "priority": "low",
+        "priority_confidence": 0.5957457995761505,
+        "status": "needs_review"
+      },
+      "split": "feedback",
+      "updated": {
+        "category": "university",
+        "category_confidence": 0.7585135821680019,
+        "model_version_id": 2,
+        "priority": "normal",
+        "priority_confidence": 0.9607155469602727,
+        "status": "classified"
+      }
+    },
+    {
+      "baseline": {
+        "category": "spam",
+        "category_confidence": 0.413882997945895,
+        "model_version_id": 1,
+        "priority": "low",
+        "priority_confidence": 0.4840567954934218,
+        "status": "needs_review"
+      },
+      "content_hash": "a790c3a94cfe40a0298459e0d2ea8a2c53e5e1676fdad2f0e4eef07c119edeec",
+      "rollback": {
+        "category": "spam",
+        "category_confidence": 0.413882997945895,
+        "model_version_id": 1,
+        "priority": "low",
+        "priority_confidence": 0.4840567954934218,
+        "status": "needs_review"
+      },
+      "split": "feedback",
+      "updated": {
+        "category": "bills",
+        "category_confidence": 0.8379330507594545,
+        "model_version_id": 2,
+        "priority": "high",
+        "priority_confidence": 0.8827533554159567,
+        "status": "classified"
+      }
+    },
+    {
+      "baseline": {
+        "category": "promotions",
+        "category_confidence": 0.5405351736614559,
+        "model_version_id": 1,
+        "priority": "low",
+        "priority_confidence": 0.7433066134974777,
+        "status": "needs_review"
+      },
+      "content_hash": "19e6cf9efb8de1ab87967d5d207bb30ec6b87e3e15bad56d02c4e6019fc194dc",
+      "rollback": {
+        "category": "promotions",
+        "category_confidence": 0.5405351736614559,
+        "model_version_id": 1,
+        "priority": "low",
+        "priority_confidence": 0.7433066134974777,
+        "status": "needs_review"
+      },
+      "split": "feedback",
+      "updated": {
+        "category": "promotions",
+        "category_confidence": 0.834947125898999,
+        "model_version_id": 2,
+        "priority": "low",
+        "priority_confidence": 0.729540865599696,
+        "status": "classified"
+      }
+    },
+    {
+      "baseline": {
+        "category": "spam",
+        "category_confidence": 0.7313804549118882,
+        "model_version_id": 1,
+        "priority": "low",
+        "priority_confidence": 0.4731153221417577,
+        "status": "needs_review"
+      },
+      "content_hash": "95e851dd8cab9be28cb257394869e3270a20e2e11798643747a5e5293cfa487d",
+      "rollback": {
+        "category": "spam",
+        "category_confidence": 0.7313804549118882,
+        "model_version_id": 1,
+        "priority": "low",
+        "priority_confidence": 0.4731153221417577,
+        "status": "needs_review"
+      },
+      "split": "feedback",
+      "updated": {
+        "category": "spam",
+        "category_confidence": 0.7803638752461295,
+        "model_version_id": 2,
+        "priority": "high",
+        "priority_confidence": 0.8793034626144866,
+        "status": "classified"
+      }
+    },
+    {
+      "baseline": {
+        "category": "spam",
+        "category_confidence": 0.6091499097957287,
+        "model_version_id": 1,
+        "priority": "high",
+        "priority_confidence": 0.5775842819038187,
+        "status": "needs_review"
+      },
+      "content_hash": "9533255c74a6aabb6c8e1b1b484d3a00d3dedf07583b50382ccd0b878a9e76c0",
+      "rollback": {
+        "category": "spam",
+        "category_confidence": 0.6091499097957287,
+        "model_version_id": 1,
+        "priority": "high",
+        "priority_confidence": 0.5775842819038187,
+        "status": "needs_review"
+      },
+      "split": "eval",
+      "updated": {
+        "category": "job opportunities",
+        "category_confidence": 0.3145312807634606,
+        "model_version_id": 2,
+        "priority": "high",
+        "priority_confidence": 0.8058732137574447,
+        "status": "needs_review"
+      }
+    },
+    {
+      "baseline": {
+        "category": "spam",
+        "category_confidence": 0.6413001198000857,
+        "model_version_id": 1,
+        "priority": "low",
+        "priority_confidence": 0.49810223135977966,
+        "status": "needs_review"
+      },
+      "content_hash": "12bd29902865ff78f9dcabb6fcac7d740e3b94a5f78b502ad57503699bd72507",
+      "rollback": {
+        "category": "spam",
+        "category_confidence": 0.6413001198000857,
+        "model_version_id": 1,
+        "priority": "low",
+        "priority_confidence": 0.49810223135977966,
+        "status": "needs_review"
+      },
+      "split": "eval",
+      "updated": {
+        "category": "spam",
+        "category_confidence": 0.26890194568040376,
+        "model_version_id": 2,
+        "priority": "high",
+        "priority_confidence": 0.6396590400029993,
+        "status": "needs_review"
+      }
+    },
+    {
+      "baseline": {
+        "category": "bills",
+        "category_confidence": 0.556497570951912,
+        "model_version_id": 1,
+        "priority": "low",
+        "priority_confidence": 0.4934388287914611,
+        "status": "needs_review"
+      },
+      "content_hash": "f3bc21d76170bd7e75b8118d25e4a3e50e34333da64467e823792bcba50a0bda",
+      "rollback": {
+        "category": "bills",
+        "category_confidence": 0.556497570951912,
+        "model_version_id": 1,
+        "priority": "low",
+        "priority_confidence": 0.4934388287914611,
+        "status": "needs_review"
+      },
+      "split": "eval",
+      "updated": {
+        "category": "bills",
+        "category_confidence": 0.783926657155544,
+        "model_version_id": 2,
+        "priority": "high",
+        "priority_confidence": 0.7119962211115768,
+        "status": "classified"
+      }
+    },
+    {
+      "baseline": {
+        "category": "promotions",
+        "category_confidence": 0.44330682573508723,
+        "model_version_id": 1,
+        "priority": "low",
+        "priority_confidence": 0.6643467158484383,
+        "status": "needs_review"
+      },
+      "content_hash": "6ab984a1c3dc2850435d6ad0730cda912ac577ee02a9b0938879baee0cf3ade3",
+      "rollback": {
+        "category": "promotions",
+        "category_confidence": 0.44330682573508723,
+        "model_version_id": 1,
+        "priority": "low",
+        "priority_confidence": 0.6643467158484383,
+        "status": "needs_review"
+      },
+      "split": "eval",
+      "updated": {
+        "category": "promotions",
+        "category_confidence": 0.5869150483369842,
+        "model_version_id": 2,
+        "priority": "low",
+        "priority_confidence": 0.525647465299965,
+        "status": "needs_review"
+      }
+    },
+    {
+      "baseline": {
+        "category": "spam",
+        "category_confidence": 0.8476891769946079,
+        "model_version_id": 1,
+        "priority": "low",
+        "priority_confidence": 0.40916528016153525,
+        "status": "needs_review"
+      },
+      "content_hash": "83cb125fe7e471ea27a2244b6f6cc20b0a960a8b7d8cb6d0dfed7d0ad3dd7ec1",
+      "rollback": {
+        "category": "spam",
+        "category_confidence": 0.8476891769946079,
+        "model_version_id": 1,
+        "priority": "low",
+        "priority_confidence": 0.40916528016153525,
+        "status": "needs_review"
+      },
+      "split": "eval",
+      "updated": {
+        "category": "spam",
+        "category_confidence": 0.6919828373274604,
+        "model_version_id": 2,
+        "priority": "high",
+        "priority_confidence": 0.7111557166011593,
+        "status": "needs_review"
+      }
+    },
+    {
+      "baseline": {
+        "category": "spam",
+        "category_confidence": 0.3897567919381888,
+        "model_version_id": 1,
+        "priority": "high",
+        "priority_confidence": 0.5036547712905713,
+        "status": "needs_review"
+      },
+      "content_hash": "df9d4fffeab678ecadb22e3b8595e7ade467c69946cfd887be8513a3af0ae956",
+      "rollback": {
+        "category": "spam",
+        "category_confidence": 0.3897567919381888,
+        "model_version_id": 1,
+        "priority": "high",
+        "priority_confidence": 0.5036547712905713,
+        "status": "needs_review"
+      },
+      "split": "eval",
+      "updated": {
+        "category": "job opportunities",
+        "category_confidence": 0.35301445617678995,
+        "model_version_id": 2,
+        "priority": "high",
+        "priority_confidence": 0.7044709411760354,
+        "status": "needs_review"
+      }
+    },
+    {
+      "baseline": {
+        "category": "spam",
+        "category_confidence": 0.41978055868027875,
+        "model_version_id": 1,
+        "priority": "low",
+        "priority_confidence": 0.4751008741478029,
+        "status": "needs_review"
+      },
+      "content_hash": "e32f5a31676aedb05b93f1c53f679ed5fed703e4ff721b6d6b7a639731bde6bc",
+      "rollback": {
+        "category": "spam",
+        "category_confidence": 0.41978055868027875,
+        "model_version_id": 1,
+        "priority": "low",
+        "priority_confidence": 0.4751008741478029,
+        "status": "needs_review"
+      },
+      "split": "eval",
+      "updated": {
+        "category": "university",
+        "category_confidence": 0.3499572248981407,
+        "model_version_id": 2,
+        "priority": "high",
+        "priority_confidence": 0.5695521783895966,
+        "status": "needs_review"
+      }
+    },
+    {
+      "baseline": {
+        "category": "spam",
+        "category_confidence": 0.6296685009639476,
+        "model_version_id": 1,
+        "priority": "low",
+        "priority_confidence": 0.48708529461875055,
+        "status": "needs_review"
+      },
+      "content_hash": "91e484592108a9eecbee4127e5202ae71dc24738d2f7702eccc22f170f1eda20",
+      "rollback": {
+        "category": "spam",
+        "category_confidence": 0.6296685009639476,
+        "model_version_id": 1,
+        "priority": "low",
+        "priority_confidence": 0.48708529461875055,
+        "status": "needs_review"
+      },
+      "split": "eval",
+      "updated": {
+        "category": "bills",
+        "category_confidence": 0.6781988461440985,
+        "model_version_id": 2,
+        "priority": "high",
+        "priority_confidence": 0.7352481389577797,
+        "status": "needs_review"
+      }
+    },
+    {
+      "baseline": {
+        "category": "promotions",
+        "category_confidence": 0.4531513011233245,
+        "model_version_id": 1,
+        "priority": "low",
+        "priority_confidence": 0.7573210299521936,
+        "status": "needs_review"
+      },
+      "content_hash": "6a1aa2db37ea060dc4f881cf7c8899cea4a22074fbe7eb7581e870e12fd16e8c",
+      "rollback": {
+        "category": "promotions",
+        "category_confidence": 0.4531513011233245,
+        "model_version_id": 1,
+        "priority": "low",
+        "priority_confidence": 0.7573210299521936,
+        "status": "needs_review"
+      },
+      "split": "eval",
+      "updated": {
+        "category": "promotions",
+        "category_confidence": 0.5344682356115525,
+        "model_version_id": 2,
+        "priority": "low",
+        "priority_confidence": 0.6001926109904845,
+        "status": "needs_review"
+      }
+    },
+    {
+      "baseline": {
+        "category": "spam",
+        "category_confidence": 0.770264124819676,
+        "model_version_id": 1,
+        "priority": "high",
+        "priority_confidence": 0.4952624444265744,
+        "status": "needs_review"
+      },
+      "content_hash": "a0bd0407b9f0cb05d7aa9f4cc4dd4aabc73c65e3f1dfa0a1ede6ffc59bab8d23",
+      "rollback": {
+        "category": "spam",
+        "category_confidence": 0.770264124819676,
+        "model_version_id": 1,
+        "priority": "high",
+        "priority_confidence": 0.4952624444265744,
+        "status": "needs_review"
+      },
+      "split": "eval",
+      "updated": {
+        "category": "spam",
+        "category_confidence": 0.6397337700688364,
+        "model_version_id": 2,
+        "priority": "high",
+        "priority_confidence": 0.7486579507291953,
+        "status": "needs_review"
+      }
+    }
+  ],
+  "protocol": "inboxlearn-synthetic-v2-candidate-workflow",
+  "random_state": 42,
+  "rollback": {
+    "feedback_retained": 5,
+    "model_blob_identical": true,
+    "predictions_and_confidences_identical": true,
+    "probes": 15
+  },
+  "source_sha256": {
+    "inboxlearn/classifier.py": "f28b9453df8ef24804d04bd31d1ecf3e678c2dfe31c4b1f4b091328b6f7fab60",
+    "inboxlearn/config.py": "08ef3c7c9c555e3385b18ddb9d717c04e8be80df034fead092f1424ce705635d",
+    "inboxlearn/db.py": "0bb9cd24d034b4fc1065f200c2a1443b4dfdc02abfa534b9b9a35d52349da708",
+    "inboxlearn/evaluation.py": "50d07573bccd9b3a8c9b82906ebd361e5be8f072de2972ead28b599fbffd32de",
+    "inboxlearn/service.py": "cc320b496544392d189db5ebd67a31a241c531a088fdd583fcc1eeda8183110b",
+    "inboxlearn/validation.py": "44986f152c642ddfcc61f6a81011d4aac895c7c8846b1f116ee9970d5f729203",
+    "scripts/experiment.py": "5fb04ad7b8b60553dafc4386735680d14b76778fd5a04d7599ecb004e5e3a4c8"
+  },
+  "splits": {
+    "eval": {
+      "category_counts": {
+        "bills": 2,
+        "job opportunities": 2,
+        "promotions": 2,
+        "spam": 2,
+        "university": 2
+      },
+      "file": "data/demo_eval.csv",
+      "priority_counts": {
+        "high": 6,
+        "low": 2,
+        "normal": 2
+      },
+      "rows": 10,
+      "sha256": "9948004f9cd5d827a9766e6728ee5fbc3b25b356963ba748eb6aaf5de634f2d3"
+    },
+    "feedback": {
+      "category_counts": {
+        "bills": 1,
+        "job opportunities": 1,
+        "promotions": 1,
+        "spam": 1,
+        "university": 1
+      },
+      "file": "data/demo_feedback.csv",
+      "priority_counts": {
+        "high": 3,
+        "low": 1,
+        "normal": 1
+      },
+      "rows": 5,
+      "sha256": "5e84c00da16f3309f4af5b2630bccf3db338c28e2d371106c1fae4e3ddd8099b"
+    },
+    "seed": {
+      "category_counts": {
+        "bills": 3,
+        "job opportunities": 3,
+        "promotions": 3,
+        "spam": 3,
+        "university": 3
+      },
+      "file": "data/demo_seed.csv",
+      "priority_counts": {
+        "high": 6,
+        "low": 4,
+        "normal": 5
+      },
+      "rows": 15,
+      "sha256": "0a4b664d4c750b5a95c1eca96f32aba55b463b2f524628c79b7f7b7ad984aef0"
+    },
+    "validation": {
+      "category_counts": {
+        "bills": 1,
+        "job opportunities": 1,
+        "promotions": 1,
+        "spam": 1,
+        "university": 1
+      },
+      "file": "data/demo_validation.csv",
+      "priority_counts": {
+        "high": 2,
+        "low": 2,
+        "normal": 1
+      },
+      "rows": 5,
+      "sha256": "8aa0461320e09c31d6ff238d528bacd335df9b994cee30501cb3a28706a211ac"
+    }
+  },
+  "temporary_database_removed": true,
+  "thresholds": {
+    "category": 0.7,
+    "priority": 0.7
+  },
+  "training": {
+    "active_predictions_unchanged_before_activation": true,
+    "evaluated_before_activation": true,
+    "feedback_ids": [
+      1,
+      2,
+      3,
+      4,
+      5
+    ],
+    "feedback_rows": 5,
+    "membership": [
+      {
+        "category": "job opportunities",
+        "email_id": 1,
+        "feedback_id": 1,
+        "priority": "high",
+        "version_id": 2
+      },
+      {
+        "category": "university",
+        "email_id": 2,
+        "feedback_id": 2,
+        "priority": "normal",
+        "version_id": 2
+      },
+      {
+        "category": "bills",
+        "email_id": 3,
+        "feedback_id": 3,
+        "priority": "high",
+        "version_id": 2
+      },
+      {
+        "category": "promotions",
+        "email_id": 4,
+        "feedback_id": 4,
+        "priority": "low",
+        "version_id": 2
+      },
+      {
+        "category": "spam",
+        "email_id": 5,
+        "feedback_id": 5,
+        "priority": "high",
+        "version_id": 2
+      }
+    ],
+    "mode": "incremental_feedback",
+    "original_predictions_preserved": true,
+    "repeat_preparation_reused_candidate": true,
+    "repeat_training_was_noop": true,
+    "seed_rows": 15,
+    "unevaluated_activation_rejected": true,
+    "updates": {
+      "category": {
+        "changed_probe_labels": 7,
+        "coefficient_l2_change": 16.949367215220217,
+        "new_examples_seen": 5
+      },
+      "priority": {
+        "changed_probe_labels": 8,
+        "coefficient_l2_change": 17.397750366201837,
+        "new_examples_seen": 5
+      }
+    }
+  },
+  "updated": {
+    "category_accuracy": 0.9,
+    "category_confusion_matrix": [
+      [
+        2,
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        0,
+        1,
+        0,
+        0,
+        1
+      ],
+      [
+        0,
+        0,
+        2,
+        0,
+        0
+      ],
+      [
+        0,
+        0,
+        0,
+        2,
+        0
+      ],
+      [
+        0,
+        0,
+        0,
+        0,
+        2
+      ]
+    ],
+    "category_labels": [
+      "job opportunities",
+      "university",
+      "bills",
+      "promotions",
+      "spam"
+    ],
+    "category_macro_f1": 0.8933333333333333,
+    "priority_accuracy": 0.8,
+    "priority_confusion_matrix": [
+      [
+        2,
+        0,
+        0
+      ],
+      [
+        0,
+        0,
+        2
+      ],
+      [
+        0,
+        0,
+        6
+      ]
+    ],
+    "priority_labels": [
+      "low",
+      "normal",
+      "high"
+    ],
+    "priority_macro_f1": 0.6190476190476191,
+    "rows": 10
+  },
+  "validation_used_for_tuning": false,
+  "versions": {
+    "active_after_rollback": "v1",
+    "baseline": "v1",
+    "parent_id": 1,
+    "updated": "v2"
+  }
+}

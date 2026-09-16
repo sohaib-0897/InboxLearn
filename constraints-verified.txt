@@ -1,0 +1,11 @@
+# Direct/numerical package versions used for reports/learning.json on Python 3.12.9.
+# Use with: python -m pip install -r requirements.txt -c constraints-verified.txt
+# This is not a full transitive dependency lock.
+streamlit==1.63.0
+scikit-learn==1.9.1
+numpy==2.5.3
+pandas==2.3.3
+pytest==9.1.1
+scipy==1.18.1
+joblib==1.6.0
+threadpoolctl==3.6.0

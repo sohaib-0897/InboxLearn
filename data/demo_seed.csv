@@ -1,0 +1,16 @@
+subject,body,sender,category,priority
+"Software engineer interview invitation","We would like to invite you to choose an interview time for the backend engineer role.",recruiting@example.test,job opportunities,high
+"Research assistant opening","A paid research assistant position is open in the data lab. Apply by Friday.",careers@example.test,job opportunities,high
+"Internship application update","Your application for the summer internship is moving to the next stage.",talent@example.test,job opportunities,normal
+"Course registration deadline","Course registration for the autumn semester closes on 20 September.",registrar@example.test,university,high
+"Library books due","Your university library books are due next week.",library@example.test,university,normal
+"Campus seminar invitation","Join the department seminar about distributed systems on Thursday.",department@example.test,university,low
+"Electricity bill ready","Your monthly electricity bill is ready. The amount due is 145.20 by 28 September.",billing@example.test,bills,high
+"Mobile plan invoice","Your mobile plan invoice for this month is available in your account.",mobile@example.test,bills,normal
+"Water service statement","This is your water service statement for the current billing period.",water@example.test,bills,normal
+"Weekend sale starts now","Save 30 percent on selected shoes during our weekend sale.",shop@example.test,promotions,low
+"Member discount newsletter","Your member discount and new seasonal collection are here.",store@example.test,promotions,low
+"Free shipping offer","Order today to receive free shipping on qualifying items.",market@example.test,promotions,low
+"Urgent account prize claim","You won a prize. Send your password and card number to claim it immediately.",unknown@example.test,spam,high
+"Verify your wallet now","Open this attachment and confirm your wallet credentials within one hour.",unknown2@example.test,spam,high
+"Strange investment opportunity","Guaranteed returns are waiting. Reply with your identity documents.",unknown3@example.test,spam,normal

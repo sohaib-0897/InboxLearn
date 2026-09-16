@@ -1,0 +1,6 @@
+subject,body,sender,category,priority
+"Mock technical screening","Please select a time for a short technical screening next week.",validation-careers@example.test,job opportunities,high
+"Student society meeting","The student society will meet in room 4 at noon on Monday.",validation-campus@example.test,university,low
+"Gas account payment notice","Your gas account payment notice includes a due date of 3 October.",validation-billing@example.test,bills,normal
+"Loyalty points bonus","Double loyalty points are available this weekend only.",validation-store@example.test,promotions,low
+"Suspicious document request","Send a copy of your passport to unlock your unexpected refund.",validation-unknown@example.test,spam,high

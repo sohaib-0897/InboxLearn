@@ -1,0 +1,11 @@
+subject,body,sender,category,priority
+"Recruiter asks for a portfolio","A recruiter would like to see your portfolio for an open developer position.",eval-careers@example.test,job opportunities,normal
+"Scholarship application reminder","Remember to submit your university scholarship application before the deadline.",eval-student@example.test,university,high
+"Internet service bill","Your internet service bill is ready and payment is due on the first of the month.",eval-billing@example.test,bills,high
+"New collection coupon","Use this coupon for savings on the new collection this week.",eval-shop@example.test,promotions,low
+"Claim your unexpected reward","Reply with your banking details to receive your guaranteed reward.",eval-unknown@example.test,spam,high
+"Part time campus job","The lab is hiring a part time student assistant for the autumn term.",eval-lab@example.test,job opportunities,normal
+"Exam timetable published","The university exam timetable has been published in the student portal.",eval-registrar@example.test,university,high
+"Credit card statement","Your credit card statement is available and the balance is due soon.",eval-card@example.test,bills,high
+"Seasonal members promotion","Members receive a limited time discount on seasonal products.",eval-members@example.test,promotions,low
+"Password reset prize scam","Your account won a prize; click a link and share the verification code.",eval-scam@example.test,spam,high

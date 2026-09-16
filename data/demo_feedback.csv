@@ -1,0 +1,6 @@
+subject,body,sender,category,priority
+"Interview moved to Tuesday","The hiring team moved your software interview to Tuesday morning.",feedback-careers@example.test,job opportunities,high
+"Academic transcript request","Please collect your academic transcript from the university office.",feedback-campus@example.test,university,normal
+"Rent invoice available","Your rent invoice is available with payment due on 5 October.",feedback-billing@example.test,bills,high
+"Subscriber sale alert","Subscribers can save 15 percent on accessories until Sunday.",feedback-shop@example.test,promotions,low
+"Unclaimed inheritance notice","Pay a small fee and send your identity details to receive an inheritance.",feedback-scam@example.test,spam,high

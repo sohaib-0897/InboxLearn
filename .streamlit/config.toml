@@ -1,0 +1,42 @@
+[browser]
+gatherUsageStats = false
+
+[server]
+headless = true
+address = "127.0.0.1"
+
+# Newsprint native-widget tokens. Companion stylesheet: assets/newsprint.css.
+[theme]
+base = "light"
+primaryColor = "#111111"
+backgroundColor = "#F9F9F7"
+secondaryBackgroundColor = "#E5E5E0"
+textColor = "#111111"
+borderColor = "#111111"
+dataframeBorderColor = "#111111"
+dataframeHeaderBackgroundColor = "#E5E5E0"
+showWidgetBorder = true
+showSidebarBorder = true
+baseRadius = "none"
+buttonRadius = "none"
+font = "Inter, Arial, sans-serif"
+headingFont = "Playfair Display, Georgia, serif"
+codeFont = "JetBrains Mono, Consolas, monospace"
+baseFontSize = 16
+headingFontSizes = ["3rem", "2rem", "1.5rem", "1.25rem", "1rem", "1rem"]
+linkColor = "#111111"
+linkUnderline = true
+redColor = "#CC0000"
+redTextColor = "#CC0000"
+redBackgroundColor = "#F9F9F7"
+greenColor = "#111111"
+greenTextColor = "#111111"
+greenBackgroundColor = "#E5E5E0"
+blueColor = "#111111"
+blueTextColor = "#111111"
+blueBackgroundColor = "#E5E5E0"
+yellowColor = "#CC0000"
+yellowTextColor = "#111111"
+yellowBackgroundColor = "#E5E5E0"
+chartCategoricalColors = ["#111111", "#525252", "#E5E5E0"]
+chartSequentialColors = ["#F9F9F7", "#F9F9F7", "#E5E5E0", "#E5E5E0", "#E5E5E0", "#525252", "#525252", "#525252", "#111111", "#111111"]

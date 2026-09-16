@@ -1,0 +1,4 @@
+# Keep verified source and fixture hashes stable across platforms.
+* text=auto eol=lf
+*.png binary
+*.zip binary
