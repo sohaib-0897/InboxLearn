@@ -1,10 +1,10 @@
 # InboxLearn
 
-**Email triage that learns from human corrections, with reviewable model changes and reversible activation.**
+**A self learning AI agent for email triage, with reviewable model changes and reversible activation.**
 
 [![CI](https://github.com/sohaib-0897/InboxLearn/actions/workflows/ci.yml/badge.svg)](https://github.com/sohaib-0897/InboxLearn/actions/workflows/ci.yml)
 
-An email classifier will make mistakes. InboxLearn demonstrates the engineering around those mistakes: efficient human review, traceable feedback, isolated candidate training, evaluation before activation, and rollback. It runs locally with Python, Streamlit, scikit-learn and SQLite.
+An email classifier will make mistakes. InboxLearn is a self learning AI agent that demonstrates the engineering around those mistakes: efficient human review, traceable feedback, isolated candidate training, evaluation before activation, and rollback. It runs locally with Python, Streamlit, scikit-learn and SQLite.
 
 **Classify → correct → prepare candidate → inspect changes → evaluate → activate → roll back**
 

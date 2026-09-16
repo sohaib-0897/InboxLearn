@@ -1,6 +1,6 @@
 # InboxLearn — portfolio evidence
 
-Local email triage with a Newsprint Streamlit interface, separate incremental classifiers for category and priority, SQLite feedback history, immutable candidate snapshots and reversible activation after evaluation. No paid API or Gmail dependency.
+Self learning AI agent for local email triage, with a Newsprint Streamlit interface, separate incremental classifiers for category and priority, SQLite feedback history, immutable candidate snapshots and reversible activation after evaluation. No paid API or Gmail dependency.
 
 ## CV bullets
 

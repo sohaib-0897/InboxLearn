@@ -2,7 +2,7 @@
 
 [Back to the project overview](../README.md)
 
-InboxLearn is a small local Streamlit app for human-in-the-loop email classification. It uses Python, SQLite, scikit-learn, and no paid APIs, Gmail integration, sending, deletion, payment, or other external calls.
+InboxLearn is a small local Streamlit app and self learning AI agent for human-in-the-loop email classification. It uses Python, SQLite, scikit-learn, and no paid APIs, Gmail integration, sending, deletion, payment, or other external calls.
 
 The agent predicts five categories (`job opportunities`, `university`, `bills`, `promotions`, `spam`) and three priorities (`low`, `normal`, `high`). It stores the original prediction, uncalibrated confidence estimates, model version, corrections, training lineage, and evaluation results in SQLite. A prediction enters review when either confidence estimate is below its configurable threshold. Suggested next actions are informational only.
 
