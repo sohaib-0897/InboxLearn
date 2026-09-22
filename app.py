@@ -1,5 +1,6 @@
 """Native Streamlit presentation over the existing InboxLearn service."""
 import json
+from datetime import date, datetime
 from math import ceil
 from pathlib import Path
 
@@ -7,7 +8,9 @@ import pandas as pd
 import streamlit as st
 
 from inboxlearn.config import CATEGORIES, PRIORITIES, Settings
+from inboxlearn.calendar_export import create_event, event_to_ics_bytes, download_filename
 from inboxlearn.demo import demo_data_path, load_demo_rows
+from inboxlearn.entities import ExtractedEntity
 from inboxlearn.service import InboxLearnService
 from inboxlearn.presentation import (
     apply_newsprint, masthead, status_strip, section, show_email,
@@ -30,11 +33,16 @@ def get_service(db_path: str, category_threshold: float, priority_threshold: flo
 
 def classify(service, payload: bytes, source="upload") -> None:
     try:
-        with st.spinner("Validating CSV and classifying messages…"):
-            result = service.classify_upload(payload, source=source)
-        flash(f"Classified {result['new']} new email(s); {result['duplicates']} duplicate(s) skipped. Original predictions saved with model v{result['version_id']}.")
+        with st.spinner("Validating and classifying messages…"):
+            result = service.classify_email_file(payload, source=source)
+        fmt_label = result.get("format", "csv").upper()
+        msg = f"Classified {result['new']} new email(s) from {fmt_label}; {result['duplicates']} duplicate(s) skipped."
+        if result.get("warnings"):
+            msg += f" {result['warnings']} parser warning(s)."
+        msg += f" Original predictions saved with model v{result['version_id']}."
+        flash(msg)
     except Exception as exc:
-        st.error(f"Could not classify CSV: {exc}")
+        st.error(f"Could not classify: {exc}")
 
 
 def message_label(row: dict) -> str:
@@ -44,16 +52,18 @@ def message_label(row: dict) -> str:
 
 def render_upload(service: InboxLearnService) -> None:
     section("01", "Inbox & intake", "Upload a batch. Inspect its predictions. Decide what needs a second look.")
-    with st.expander("Import CSV / demonstration files", expanded=not service.repo.inbox_rows()):
+    with st.expander("Import emails", expanded=not service.repo.inbox_rows()):
         upload, guidance = st.columns([3, 2], gap="large")
         with upload:
-            uploaded = st.file_uploader("Email CSV", type=["csv"], key="email_upload",
+            uploaded = st.file_uploader("Email file", type=["csv", "eml", "mbox"], key="email_upload",
                                         max_upload_size=max(1, ceil(service.settings.max_upload_bytes / 1024**2)))
-            if st.button("Classify CSV", type="primary", disabled=uploaded is None, key="classify_csv"):
+            if st.button("Classify file", type="primary", disabled=uploaded is None, key="classify_csv"):
                 classify(service, uploaded.getvalue())
         with guidance:
-            st.markdown("**CSV SPECIFICATION**")
-            st.write("UTF-8 · subject and body required · sender optional. Subject and body must be non-empty. Duplicate rows within a file are rejected; previously imported emails are skipped.")
+            st.markdown("**SUPPORTED FORMATS**")
+            st.write("**CSV** · UTF-8, subject and body required, sender optional.")
+            st.write("**EML** · Single RFC 822 email file (.eml).")
+            st.write("**MBOX** · Mailbox archive with multiple messages (.mbox).")
             st.caption(f"Limit: {service.settings.max_upload_bytes / 1024**2:g} MiB / {service.settings.max_rows:,} rows. Supplied label columns are not used for training.")
             st.download_button("Download demo feedback CSV", demo_data_path("demo_feedback.csv").read_bytes(), "demo_feedback.csv", "text/csv", key="demo_download")
             if st.button("Classify demonstration sample", key="demo_classify"):
@@ -62,8 +72,10 @@ def render_upload(service: InboxLearnService) -> None:
 
     rows = service.review_rows(include_confident=True)
     if not rows:
-        st.info("Your inbox is empty. Upload a CSV or classify the demonstration sample above.")
+        st.info("Your inbox is empty. Upload a CSV, .eml, or .mbox file, or classify the demonstration sample above.")
         return
+    batches = service.import_batches()
+    batch_options = ["All batches"] + [b["import_batch"] for b in batches] if batches else []
     with st.container(key="inbox_filters"):
         query_col, category_col, status_col = st.columns([2, 1, 1])
         with query_col:
@@ -72,9 +84,14 @@ def render_upload(service: InboxLearnService) -> None:
             category = st.selectbox("Predicted category", ["All categories", *CATEGORIES], key="inbox_category")
         with status_col:
             status = st.selectbox("Review status", ["All statuses", *STATUS_LABELS.values()], key="inbox_status")
+    if batch_options:
+        batch_filter = st.selectbox("Import batch", batch_options, key="inbox_batch")
+    else:
+        batch_filter = "All batches"
     filtered = [r for r in rows if (not query or query in " ".join([r['subject'], r['body'], r['sender']]).casefold())
                 and (category == "All categories" or r["category"] == category)
-                and (status == "All statuses" or STATUS_LABELS[r["status"]] == status)]
+                and (status == "All statuses" or STATUS_LABELS[r["status"]] == status)
+                and (batch_filter == "All batches" or r.get("import_batch", "") == batch_filter)]
     listing, detail = st.columns([7, 4], gap="large")
     with listing:
         st.caption(f"{len(filtered)} of {len(rows)} messages · original predictions")
@@ -99,6 +116,40 @@ def render_upload(service: InboxLearnService) -> None:
             row = next(r for r in filtered if r["id"] == selected_id)
             show_email(row)
             original_prediction(row)
+            # Extracted entities display
+            entities = service.entities_for_email(int(row["id"]))
+            if entities:
+                with st.expander(f"Extracted entities ({len(entities)})", expanded=False):
+                    for entity in entities:
+                        icon = {"deadline": "📅", "date_mention": "📆", "amount": "💰",
+                                "action_item": "✅", "contact_email": "📧", "url": "🔗"}.get(entity["entity_type"], "📌")
+                        st.write(f"{icon} **{entity['entity_type']}**: {entity['entity_value'] or '(unresolved)'}")
+                        if entity["source_phrase"]:
+                            st.caption(f"From: \"{entity['source_phrase']}\"")
+                    # Calendar export for deadline entities
+                    deadline_entities = [e for e in entities if e["entity_type"] in ("deadline", "date_mention") and e["entity_value"]]
+                    if deadline_entities:
+                        st.markdown("---")
+                        st.markdown("**Calendar export**")
+                        for i, entity in enumerate(deadline_entities):
+                            try:
+                                parsed_date = date.fromisoformat(entity["entity_value"])
+                                event = create_event(
+                                    summary=f"{row['category'].title()}: {row['subject'][:60]}",
+                                    dtstart=parsed_date,
+                                    description=f"InboxLearn email #{row['id']}: {row['subject']}\n\nSource: {entity['source_phrase']}",
+                                    email_id=int(row["id"]),
+                                    source_phrase=entity["source_phrase"],
+                                )
+                                st.download_button(
+                                    f"📅 Download .ics ({entity['entity_value']})",
+                                    event_to_ics_bytes(event),
+                                    download_filename(event),
+                                    "text/calendar",
+                                    key=f"ics_{row['id']}_{i}",
+                                )
+                            except (ValueError, TypeError):
+                                pass
             st.caption("Open Review queue to confirm or revise these labels.")
 
 
@@ -136,6 +187,36 @@ def render_review(service: InboxLearnService) -> None:
         st.caption("Confidence is an uncalibrated model estimate.")
         st.write("Suggested next action: " + row["suggested_action"])
         st.caption("Suggestion based on the original category. No action is executed.")
+        # Entities in review pane
+        entities = service.entities_for_email(int(row["id"]))
+        if entities:
+            with st.expander(f"Extracted entities ({len(entities)})"):
+                for entity in entities:
+                    icon = {"deadline": "📅", "date_mention": "📆", "amount": "💰",
+                            "action_item": "✅", "contact_email": "📧", "url": "🔗"}.get(entity["entity_type"], "📌")
+                    st.write(f"{icon} **{entity['entity_type']}**: {entity['entity_value'] or '(unresolved)'}")
+                    if entity["source_phrase"]:
+                        st.caption(f"From: \"{entity['source_phrase']}\"")
+                deadline_entities = [e for e in entities if e["entity_type"] in ("deadline", "date_mention") and e["entity_value"]]
+                for i, entity in enumerate(deadline_entities):
+                    try:
+                        parsed_date = date.fromisoformat(entity["entity_value"])
+                        event = create_event(
+                            summary=f"{row['category'].title()}: {row['subject'][:60]}",
+                            dtstart=parsed_date,
+                            description=f"InboxLearn email #{row['id']}: {row['subject']}\n\nSource: {entity['source_phrase']}",
+                            email_id=int(row["id"]),
+                            source_phrase=entity["source_phrase"],
+                        )
+                        st.download_button(
+                            f"📅 Download .ics ({entity['entity_value']})",
+                            event_to_ics_bytes(event),
+                            download_filename(event),
+                            "text/calendar",
+                            key=f"review_ics_{row['id']}_{i}",
+                        )
+                    except (ValueError, TypeError):
+                        pass
     with editing, st.container(key="correction_panel"):
         st.subheader("Human confirmation")
         history = row["feedback_history"]

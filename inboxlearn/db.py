@@ -111,6 +111,58 @@ class Repository:
     def _initialize(self) -> None:
         with closing(self._connect()) as conn:
             conn.executescript(SCHEMA)
+            self._migrate(conn)
+
+    def _migrate(self, conn: sqlite3.Connection) -> None:
+        """Apply additive schema migrations. Safe to call repeatedly."""
+        conn.execute("CREATE TABLE IF NOT EXISTS schema_migrations (version INTEGER PRIMARY KEY)")
+        
+        # Migration 1: V2 Schema Extensions
+        row = conn.execute("SELECT version FROM schema_migrations WHERE version=1").fetchone()
+        if not row:
+            # emails table additions
+            try:
+                conn.execute("ALTER TABLE emails ADD COLUMN message_id TEXT DEFAULT ''")
+                conn.execute("ALTER TABLE emails ADD COLUMN in_reply_to TEXT DEFAULT ''")
+                conn.execute("ALTER TABLE emails ADD COLUMN thread_id TEXT DEFAULT ''")
+                conn.execute("ALTER TABLE emails ADD COLUMN date_header TEXT DEFAULT ''")
+                conn.execute("ALTER TABLE emails ADD COLUMN source_type TEXT NOT NULL DEFAULT 'csv'")
+                conn.execute("ALTER TABLE emails ADD COLUMN import_batch TEXT NOT NULL DEFAULT ''")
+                conn.execute("ALTER TABLE emails ADD COLUMN parser_warnings_json TEXT")
+            except sqlite3.OperationalError:
+                pass # columns might already exist
+
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_emails_thread ON emails(thread_id)")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_emails_message_id ON emails(message_id)")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_emails_import_batch ON emails(import_batch)")
+
+            conn.execute("""
+            CREATE TABLE IF NOT EXISTS extracted_entities (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                email_id INTEGER NOT NULL REFERENCES emails(id) ON DELETE CASCADE,
+                entity_type TEXT NOT NULL,
+                entity_value TEXT NOT NULL,
+                source_phrase TEXT NOT NULL DEFAULT '',
+                confidence REAL NOT NULL DEFAULT 1.0,
+                created_at TEXT NOT NULL
+            )""")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_entities_email ON extracted_entities(email_id)")
+
+            conn.execute("""
+            CREATE TABLE IF NOT EXISTS action_journal (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                email_id INTEGER NOT NULL REFERENCES emails(id),
+                action_type TEXT NOT NULL,
+                payload_json TEXT NOT NULL,
+                status TEXT NOT NULL DEFAULT 'staged',
+                executed_at TEXT,
+                undo_payload_json TEXT,
+                created_at TEXT NOT NULL
+            )""")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_actions_email ON action_journal(email_id)")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_actions_status ON action_journal(status)")
+            
+            conn.execute("INSERT INTO schema_migrations (version) VALUES (1)")
 
     @contextmanager
     def training_transaction(self) -> Iterator[sqlite3.Connection]:
@@ -299,3 +351,112 @@ class Repository:
                LEFT JOIN feedback f ON f.id=(SELECT MAX(id) FROM feedback WHERE email_id=e.id)
                ORDER BY e.id"""
         )
+
+    def insert_email_extended(self, row: dict, content_hash: str, prediction: dict, *, source: str = 'upload', source_type: str = 'csv', import_batch: str = '', message_id: str = '', in_reply_to: str = '', thread_id: str = '', date_header: str = '', parser_warnings: list[str] | None = None) -> int:
+        """Insert email with extended metadata. Deduplicates by content_hash."""
+        with closing(self._connect()) as conn:
+            conn.execute("BEGIN IMMEDIATE")
+            existing = conn.execute("SELECT id FROM emails WHERE content_hash=?", (content_hash,)).fetchone()
+            if existing:
+                conn.commit()
+                return int(existing["id"])
+            created = utc_now()
+            warnings_json = json.dumps(parser_warnings) if parser_warnings else None
+            
+            cursor = conn.execute(
+                """INSERT INTO emails(
+                    subject, body, sender, content_hash, source, created_at,
+                    message_id, in_reply_to, thread_id, date_header, source_type, import_batch, parser_warnings_json
+                   ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                (row["subject"], row["body"], row.get("sender", ""), content_hash, source, created,
+                 message_id, in_reply_to, thread_id, date_header, source_type, import_batch, warnings_json)
+            )
+            email_id = int(cursor.lastrowid)
+            conn.execute(
+                """INSERT INTO predictions(email_id, model_version_id, category, priority,
+                   category_confidence, priority_confidence, status, is_original, created_at)
+                   VALUES (?,?,?,?,?,?,?,?,?)""",
+                (email_id, prediction["model_version_id"], prediction["category"], prediction["priority"],
+                 prediction["category_confidence"], prediction["priority_confidence"], prediction["status"], 1, created),
+            )
+            conn.commit()
+            return email_id
+
+    def import_batches(self) -> list[dict]:
+        """List distinct import batches with counts."""
+        rows = self._all("SELECT import_batch, COUNT(*) as count FROM emails GROUP BY import_batch ORDER BY import_batch DESC")
+        return [{"import_batch": r["import_batch"], "count": r["count"]} for r in rows if r["import_batch"]]
+
+    def inbox_rows_filtered(self, *, import_batch: str = '', **kwargs) -> list[sqlite3.Row]:
+        """Inbox rows with optional import batch filter."""
+        review_only = kwargs.get("review_only", False)
+        include_confident = kwargs.get("include_confident", True)
+        
+        where_clauses = []
+        if review_only or not include_confident:
+            where_clauses.append("p.status='needs_review'")
+        if import_batch:
+            where_clauses.append("e.import_batch=?")
+            
+        where = ""
+        if where_clauses:
+            where = "WHERE " + " AND ".join(where_clauses)
+            
+        params = (import_batch,) if import_batch else ()
+        
+        return self._all(
+            f"""SELECT e.*, p.model_version_id, p.category, p.priority,
+                    p.category_confidence, p.priority_confidence, p.status,
+                    p.created_at AS prediction_created_at
+                FROM emails e JOIN predictions p ON p.email_id=e.id AND p.is_original=1
+                {where} ORDER BY e.id DESC""",
+            params
+        )
+
+    def save_entity(self, email_id: int, entity_type: str, entity_value: str, source_phrase: str = '', confidence: float = 1.0) -> int:
+        """Save an extracted entity for an email."""
+        with closing(self._connect()) as conn:
+            cursor = conn.execute(
+                """INSERT INTO extracted_entities(email_id, entity_type, entity_value, source_phrase, confidence, created_at)
+                   VALUES (?,?,?,?,?,?)""",
+                (email_id, entity_type, entity_value, source_phrase, confidence, utc_now())
+            )
+            conn.commit()
+            return int(cursor.lastrowid)
+
+    def entities_for_email(self, email_id: int) -> list[sqlite3.Row]:
+        """Get all extracted entities for an email."""
+        return self._all("SELECT * FROM extracted_entities WHERE email_id=? ORDER BY id", (email_id,))
+
+    def save_action(self, email_id: int, action_type: str, payload: dict) -> int:
+        """Stage an action in the journal."""
+        with closing(self._connect()) as conn:
+            cursor = conn.execute(
+                """INSERT INTO action_journal(email_id, action_type, payload_json, status, created_at)
+                   VALUES (?,?,?,?,?)""",
+                (email_id, action_type, json.dumps(payload), 'staged', utc_now())
+            )
+            conn.commit()
+            return int(cursor.lastrowid)
+
+    def execute_action(self, action_id: int) -> None:
+        """Mark an action as executed with timestamp."""
+        with closing(self._connect()) as conn:
+            conn.execute(
+                "UPDATE action_journal SET status='executed', executed_at=? WHERE id=?",
+                (utc_now(), action_id)
+            )
+            conn.commit()
+
+    def revert_action(self, action_id: int) -> None:
+        """Mark an action as reverted."""
+        with closing(self._connect()) as conn:
+            conn.execute(
+                "UPDATE action_journal SET status='reverted' WHERE id=?",
+                (action_id,)
+            )
+            conn.commit()
+
+    def actions_for_email(self, email_id: int) -> list[sqlite3.Row]:
+        """Get action journal entries for an email."""
+        return self._all("SELECT * FROM action_journal WHERE email_id=? ORDER BY id", (email_id,))

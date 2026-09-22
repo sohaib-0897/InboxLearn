@@ -9,7 +9,9 @@ from .classifier import deserialize_bundle, serialize_bundle, train_bundle
 from .config import CATEGORIES, PRIORITIES, Settings
 from .db import Repository
 from .demo import load_demo_rows
+from .entities import extract_entities
 from .evaluation import assert_split_isolated, comparison_payload, dataset_hash, evaluate_bundle, tune_review_thresholds
+from .parsers import parse_eml_bytes, parse_mbox_bytes, detect_format
 from .validation import content_hash, parse_csv_bytes, split_key
 
 
@@ -101,6 +103,82 @@ class InboxLearnService:
             else:
                 new_count += 1
         return {"rows": len(rows), "new": new_count, "duplicates": duplicate_count, "version_id": int(version["id"])}
+
+    def classify_email_file(self, payload: bytes, *, filename: str = "", source: str = "upload") -> dict:
+        """Import and classify .eml or .mbox files using the new parsers."""
+        fmt = detect_format(payload)
+        if fmt == "csv":
+            return self.classify_upload(payload, source=source)
+        import_batch = f"{source}:{hashlib.sha256(payload[:1024]).hexdigest()[:12]}"
+        if fmt == "eml":
+            rows = parse_eml_bytes(payload, import_batch=import_batch)
+        elif fmt == "mbox":
+            rows = parse_mbox_bytes(payload, import_batch=import_batch)
+        else:
+            raise ValueError(f"Unsupported file format: {fmt}")
+
+        version = self.repo.active_version()
+        if not version:
+            self.ensure_baseline()
+            version = self.repo.active_version()
+        bundle = deserialize_bundle(version["model_blob"])
+        new_count = 0
+        duplicate_count = 0
+        warning_count = 0
+        for row in rows:
+            if row.get("parser_warnings"):
+                warning_count += len(row["parser_warnings"])
+            prediction = bundle.predict(
+                row,
+                int(version["id"]),
+                self.settings.category_threshold,
+                self.settings.priority_threshold,
+            )
+            before = self.repo._one("SELECT id FROM emails WHERE content_hash=?", (content_hash(row),))
+            email_id = self.repo.insert_email_extended(
+                row, content_hash(row), prediction,
+                source=source,
+                source_type=fmt,
+                import_batch=import_batch,
+                message_id=row.get("message_id", ""),
+                in_reply_to=row.get("in_reply_to", ""),
+                thread_id=row.get("thread_id", ""),
+                date_header=row.get("date", ""),
+                parser_warnings=row.get("parser_warnings"),
+            )
+            if before:
+                duplicate_count += 1
+            else:
+                new_count += 1
+                # Auto-extract entities for newly imported emails.
+                self._extract_and_save_entities(email_id, row)
+        return {
+            "rows": len(rows), "new": new_count, "duplicates": duplicate_count,
+            "warnings": warning_count, "version_id": int(version["id"]),
+            "import_batch": import_batch, "format": fmt,
+        }
+
+    def _extract_and_save_entities(self, email_id: int, row: dict) -> None:
+        """Extract entities from an email and persist them."""
+        text = f"{row.get('subject', '')} {row.get('body', '')}"
+        entities = extract_entities(text)
+        for entity in entities:
+            self.repo.save_entity(
+                email_id,
+                entity.entity_type,
+                entity.value,
+                source_phrase=entity.raw_phrase,
+                confidence=entity.confidence,
+            )
+
+    def entities_for_email(self, email_id: int) -> list[dict]:
+        """Get extracted entities for an email as plain dicts."""
+        return [dict(row) for row in self.repo.entities_for_email(email_id)]
+
+    def import_batches(self) -> list[dict]:
+        """Get import batch listing."""
+        return self.repo.import_batches()
+
 
     def save_feedback(self, email_id: int, category: str, priority: str) -> tuple[int, bool]:
         category = category.strip().casefold()
