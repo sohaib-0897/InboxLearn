@@ -1,6 +1,6 @@
 {
   "desktop": {
-    "browser": "152.0.7977.83",
+    "browser": "153.0.8010.52",
     "viewport": {
       "width": 1440,
       "height": 1000
@@ -50,7 +50,7 @@
     "preview_matches_learning_report": true
   },
   "mobile": {
-    "browser": "152.0.7977.83",
+    "browser": "153.0.8010.52",
     "viewport": {
       "width": 390,
       "height": 844
@@ -99,28 +99,28 @@
     "scores_match_learning_report": true,
     "preview_matches_learning_report": true
   },
-  "captured_at": "2026-09-16T06:07:51.991105+00:00",
+  "captured_at": "2026-09-23T02:43:44.388113+00:00",
   "source_sha256": {
-    "app.py": "d96b05cc4c225519945e183dd2e7975315307ec8032f369fb2250db3a998f10f",
+    "app.py": "ce449cbef74c233482183c5c7e565b28452cb68ba0e8f30b38999eb111b0a405",
     "inboxlearn/presentation.py": "ec8adddac77ab8286ffb3f2816f4feceec4b8c471bd2a99ec44e2f6e39daead0",
     "assets/newsprint.css": "8f96411947eb4d148c95c940e682d429e1595e738ffb5d8d293c86461a926934",
     ".streamlit/config.toml": "0744d6c4040cc7f584ac8399b949888dc598e89af0751d6f00c3a5992473966a",
     "scripts/browser_qa.py": "f303cd3437bafcc782e29b39273e4ab8f050edc0c2f52b0dec96b297bef794bd"
   },
   "screenshot_sha256": {
-    "desktop-inbox.png": "a5ae35e6ae44c27ce431cddd2ed40e6186920ef9fba923eac579ec3f97843d4f",
-    "desktop-review.png": "1f8b0c2cc8561c411250011d0fc5b700505eed120f8dac195ce217c18baa7a73",
-    "desktop-candidate.png": "a1825d337db673b2eeebe29dda21df6735648de6ba0d304a92e9badc46d137e6",
+    "desktop-inbox.png": "9a9e623346e23b7278ee2dbaed9576d9c854c756ff04a6b179182fe070794277",
+    "desktop-review.png": "d98432724bbb29ab404daf2145b5ddd28af8d11861817b5f795749e358324d7e",
+    "desktop-candidate.png": "bc4298cf825bbb28a6125939592f46aa48610307b6aae552d8d8ace0f625e718",
     "desktop-prediction-changes.png": "71a9126eddb1bb7b424327c5fe83465dcb894a41543c34c85462b88958469890",
-    "desktop-evaluation.png": "fa45fb7af96bcc9775b07130c033b05a7cd9a232cbee2ed4bb27b138bbf35b7a",
-    "desktop-matrices.png": "4765716b8b04e10d1f43e16a0d666c496cf8d0b8de78ba0f6443e0bd51e0c8c0",
-    "desktop-versions.png": "399e40f8f6007ac39ed751ef3f55466533e2a2819cad1f627b1eb25a95cda068",
-    "mobile-inbox.png": "8aa9df64d6a77770a27212413284fe46522f2f3bdb86d993ecafb40073191655",
+    "desktop-evaluation.png": "98abcec69102343c4b071e9f20af02bc66ce12f0361bbb642ac93e45bcb49870",
+    "desktop-matrices.png": "29ea334924edc4813c56b70b76824a4214118a0271c65e4d50e1239c12963e5a",
+    "desktop-versions.png": "dc7d8ded0a16e10fabbf17454c4be2f511cdd5338af107fba5f839d3c325819e",
+    "mobile-inbox.png": "5319c700be18c6a43513a31adde762e3000c0159a07f06fee5c832b96e40e8f4",
     "mobile-review.png": "a1705aab756ca5ca32fa416ffcc9250bc09979d5f41a2a0ca7a7fec97d4388a2",
-    "mobile-candidate.png": "c57e05845877031302d074a4a0af35d64fdc4a262b19dbfd72ae0a67c4bd831c",
+    "mobile-candidate.png": "2e041f1cd1565cc3d0b2c457d4d3908c2781a8eecd6778f60924dd509fa2e64e",
     "mobile-prediction-changes.png": "6d7a20e33387c748101c79b33b99b31f91d29ac3ab9acc8466501bde03b7cb62",
-    "mobile-evaluation.png": "07084b5a99e9d93daa6785d0599a3eb213671383bd92f330883e1b918425324c",
-    "mobile-matrices.png": "b85382e634c0523205996a6acd4c6d4f60041492a0ae2e908f38ff90b604c5f3",
-    "mobile-versions.png": "38e73eab148a4d0f3b7771aae69d2ac4490ca4a7b72ec1d03d0717edea9acdae"
+    "mobile-evaluation.png": "1f4f573a1c4deea9cddc4c0329306765c60fa4433b405fb2d08b527fb86bd94a",
+    "mobile-matrices.png": "8e212b2839c6d7192bc48009012344c92352b2461da8536cba97e8eecb813331",
+    "mobile-versions.png": "7cf9b39df5cf78b5a3dd95a8c53970a7b3deeae317ca5acd20bcb816ae42c540"
   }
 }
