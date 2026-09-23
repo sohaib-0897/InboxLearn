@@ -40,8 +40,45 @@ def section(number: str, title: str, description: str) -> None:
     st.write(description)
 
 
+def _field(row, key, default=""):
+    try:
+        val = row[key]
+        return val if val is not None else default
+    except (KeyError, IndexError, TypeError):
+        return default
+
+
 def show_email(row: dict) -> None:
-    st.caption(f"MESSAGE #{row['id']} / {STATUS_LABELS[row['status']].upper()}")
+    status_label = STATUS_LABELS.get(_field(row, "status"), str(_field(row, "status"))).upper()
+    source_type = (_field(row, "source_type") or "csv").upper()
+    date_header = _field(row, "date_header")
+    
+    meta_line = f"MESSAGE #{row['id']} / {status_label} · SOURCE: {source_type}"
+    if date_header:
+        meta_line += f" · DATE: {date_header}"
+    st.caption(meta_line)
+
+    msg_id = _field(row, "message_id")
+    in_reply = _field(row, "in_reply_to")
+    if msg_id or in_reply:
+        with st.expander("Technical headers", expanded=False):
+            if msg_id:
+                st.caption(f"Message-ID: {msg_id}")
+            if in_reply:
+                st.caption(f"In-Reply-To: {in_reply}")
+
+    warnings_json = _field(row, "parser_warnings_json")
+    if warnings_json:
+        import json
+        try:
+            warnings = json.loads(warnings_json)
+            if warnings:
+                with st.expander(f"⚠️ Parser warnings ({len(warnings)})", expanded=False):
+                    for w in warnings:
+                        st.caption(f"• {w}")
+        except Exception:
+            pass
+
     # Never interpret email subjects, senders or bodies as Markdown/HTML.
     st.text("Subject: " + row["subject"])
     st.text("From: " + (row["sender"] or "Not supplied"))

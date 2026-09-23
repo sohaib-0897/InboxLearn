@@ -21,9 +21,9 @@ from inboxlearn.presentation import (
 
 st.set_page_config(page_title="InboxLearn", page_icon="✉", layout="wide", initial_sidebar_state="collapsed")
 
-APP_VERSION = "2.1.1"
+APP_VERSION = "2.2.0"
 
-# Ensure InboxLearnService class definition has gmail methods even if an older instance was in memory
+# Ensure InboxLearnService class definition has gmail and action journal methods even if an older instance was in memory
 if not hasattr(InboxLearnService, "gmail_status"):
     from inboxlearn.gmail import (
         CredentialStore as _CS, GmailClient as _GC, is_gmail_enabled as _ige,
@@ -57,6 +57,12 @@ if not hasattr(InboxLearnService, "gmail_status"):
     InboxLearnService.sync_gmail = _fallback_sync_gmail
     InboxLearnService.disconnect_gmail = _fallback_disconnect_gmail
 
+if not hasattr(InboxLearnService, "stage_action"):
+    InboxLearnService.stage_action = lambda self, email_id, action_type, payload=None: self.repo.save_action(email_id, action_type, payload or {})
+    InboxLearnService.execute_action = lambda self, action_id: self.repo.execute_action(action_id)
+    InboxLearnService.revert_action = lambda self, action_id: self.repo.revert_action(action_id)
+    InboxLearnService.email_actions = lambda self, email_id: [dict(r) for r in self.repo.actions_for_email(email_id)]
+
 
 @st.cache_resource
 def get_service(db_path: str, category_threshold: float, priority_threshold: float,
@@ -69,10 +75,18 @@ def get_service(db_path: str, category_threshold: float, priority_threshold: flo
     ))
 
 
-def classify(service, payload: bytes, source="upload") -> None:
+def _row_val(row, key, default=""):
+    try:
+        val = row[key]
+        return val if val is not None else default
+    except (KeyError, IndexError, TypeError):
+        return default
+
+
+def classify(service, payload: bytes, filename: str = "", source="upload") -> None:
     try:
         with st.spinner("Validating and classifying messages…"):
-            result = service.classify_email_file(payload, source=source)
+            result = service.classify_email_file(payload, filename=filename, source=source)
         fmt_label = result.get("format", "csv").upper()
         msg = f"Classified {result['new']} new email(s) from {fmt_label}; {result['duplicates']} duplicate(s) skipped."
         if result.get("warnings"):
@@ -88,7 +102,7 @@ def message_label(row: dict) -> str:
     return f"#{row['id']} · {subject[:72]}{'…' if len(subject) > 72 else ''}"
 
 
-def render_calendar_editor(row: dict, entities: list[dict], key_prefix: str) -> None:
+def render_calendar_editor(row: dict, entities: list[dict], key_prefix: str, service: InboxLearnService | None = None) -> None:
     """Render extracted entities and an interactive form to confirm/edit dates and timezone before .ics export."""
     if not entities:
         return
@@ -159,15 +173,77 @@ def render_calendar_editor(row: dict, entities: list[dict], key_prefix: str) -> 
                     timezone_name=ev_tz,
                 )
                 ics_data = event_to_ics_bytes(event)
-                st.download_button(
-                    label=f"📅 Download confirmed .ics file",
-                    data=ics_data,
-                    file_name=download_filename(event),
-                    mime="text/calendar",
-                    key=f"{key_prefix}_btn_ics_dl",
-                )
+                c_dl, c_log = st.columns([2, 1])
+                with c_dl:
+                    st.download_button(
+                        label=f"📅 Download confirmed .ics file",
+                        data=ics_data,
+                        file_name=download_filename(event),
+                        mime="text/calendar",
+                        key=f"{key_prefix}_btn_ics_dl",
+                    )
+                with c_log:
+                    if service and st.button("Log to journal", key=f"{key_prefix}_btn_log_cal"):
+                        service.stage_action(int(row["id"]), "calendar_event", {
+                            "description": f"Schedule calendar event: {event.summary} on {event.dtstart}",
+                            "summary": event.summary,
+                            "dtstart": str(event.dtstart),
+                        })
+                        flash(f"Logged calendar event '{event.summary}' in Action Journal.")
             except Exception as exc:
                 st.error(f"Cannot generate .ics: {exc}")
+
+
+def render_action_journal(service: InboxLearnService, row: dict, key_prefix: str) -> None:
+    """Render the Action Journal for an email: audit history, staging actions, and marking execution/reversion."""
+    email_id = int(row["id"])
+    actions = service.email_actions(email_id)
+    with st.expander(f"Action journal ({len(actions)})", expanded=bool(actions)):
+        st.markdown("**ACTION JOURNAL**")
+        st.caption("Stage suggested actions, mark completion, or cancel/revert them. All actions are local audit records.")
+
+        if actions:
+            st.markdown("**Action History:**")
+            for act in actions:
+                st_icon = {"staged": "⏳", "executed": "✅", "reverted": "↩️"}.get(act["status"], "•")
+                act_col1, act_col2 = st.columns([3, 2])
+                with act_col1:
+                    payload = json.loads(act["payload_json"]) if isinstance(act.get("payload_json"), str) else act.get("payload_json", {})
+                    desc = payload.get("description") or act["action_type"]
+                    st.write(f"{st_icon} **{act['action_type']}**: {desc}")
+                    exec_info = f" · Executed: {act.get('executed_at', '')}" if act.get("executed_at") else ""
+                    st.caption(f"Status: {act['status'].upper()} · Staged: {act['created_at']}{exec_info}")
+                with act_col2:
+                    if act["status"] == "staged":
+                        c_exec, c_rev = st.columns(2)
+                        with c_exec:
+                            if st.button("Mark done", key=f"{key_prefix}_act_exec_{act['id']}"):
+                                service.execute_action(int(act["id"]))
+                                flash(f"Action #{act['id']} marked as executed.")
+                        with c_rev:
+                            if st.button("Cancel", key=f"{key_prefix}_act_rev_{act['id']}"):
+                                service.revert_action(int(act["id"]))
+                                flash(f"Action #{act['id']} cancelled.")
+                    elif act["status"] == "executed":
+                        if st.button("Revert", key=f"{key_prefix}_act_rev_{act['id']}"):
+                            service.revert_action(int(act["id"]))
+                            flash(f"Action #{act['id']} reverted.")
+            st.markdown("---")
+
+        st.markdown("**Stage an Action:**")
+        suggested = _row_val(row, "suggested_action") or "Review email content"
+        stage_col1, stage_col2 = st.columns([3, 1])
+        with stage_col1:
+            action_desc = st.text_input("Action description", value=suggested, key=f"{key_prefix}_new_action_desc")
+        with stage_col2:
+            action_type = st.selectbox("Action type", ["suggested_next", "follow_up", "archive", "calendar_event", "custom"], key=f"{key_prefix}_new_action_type")
+
+        if st.button("Stage action", key=f"{key_prefix}_btn_stage_action"):
+            if action_desc.strip():
+                aid = service.stage_action(email_id, action_type, {"description": action_desc.strip()})
+                flash(f"Action #{aid} staged in Action Journal.")
+            else:
+                st.error("Please provide an action description.")
 
 
 
@@ -178,8 +254,10 @@ def render_upload(service: InboxLearnService) -> None:
         with upload:
             uploaded = st.file_uploader("Email file", type=["csv", "eml", "mbox"], key="email_upload",
                                         max_upload_size=max(1, ceil(service.settings.max_upload_bytes / 1024**2)))
-            if st.button("Classify CSV", type="primary", disabled=uploaded is None, key="classify_csv"):
-                classify(service, uploaded.getvalue())
+            fname = getattr(uploaded, "name", "")
+            btn_label = "Classify email file" if (fname.lower().endswith((".eml", ".mbox"))) else "Classify CSV"
+            if st.button(btn_label, type="primary", disabled=uploaded is None, key="classify_csv"):
+                classify(service, uploaded.getvalue(), filename=fname)
         with guidance:
             st.markdown("**SUPPORTED FORMATS**")
             st.write("**CSV** · UTF-8, subject and body required, sender optional.")
@@ -280,9 +358,15 @@ def render_upload(service: InboxLearnService) -> None:
         st.caption(f"{len(filtered)} of {len(rows)} messages · original predictions")
         if filtered:
             st.dataframe(pd.DataFrame([{
-                "ID": r["id"], "Subject": r["subject"], "Category": r["category"],
-                "Priority": r["priority"], "Category estimate": r["category_confidence"],
-                "Priority estimate": r["priority_confidence"], "Status": STATUS_LABELS[r["status"]],
+                "ID": r["id"],
+                "Date": _row_val(r, "date_header") or "—",
+                "Source": (_row_val(r, "source_type") or "csv").upper(),
+                "Subject": r["subject"],
+                "Category": r["category"],
+                "Priority": r["priority"],
+                "Category estimate": r["category_confidence"],
+                "Priority estimate": r["priority_confidence"],
+                "Status": STATUS_LABELS.get(_row_val(r, "status"), str(_row_val(r, "status"))),
             } for r in filtered]), hide_index=True, width="stretch", height=360,
                 column_config={name: st.column_config.NumberColumn(format="percent") for name in ["Category estimate", "Priority estimate"]}, key="inbox_table")
         else:
@@ -301,7 +385,8 @@ def render_upload(service: InboxLearnService) -> None:
             original_prediction(row)
             # Extracted entities and interactive calendar editor
             entities = service.entities_for_email(int(row["id"]))
-            render_calendar_editor(row, entities, f"inbox_{row['id']}")
+            render_calendar_editor(row, entities, f"inbox_{row['id']}", service=service)
+            render_action_journal(service, row, f"inbox_act_{row['id']}")
             st.caption("Open Review queue to confirm or revise these labels.")
 
 
@@ -394,7 +479,8 @@ def render_review(service: InboxLearnService) -> None:
         st.caption("Suggestion based on the original category. No action is executed.")
         # Extracted entities and interactive calendar editor
         entities = service.entities_for_email(int(row["id"]))
-        render_calendar_editor(row, entities, f"review_{row['id']}")
+        render_calendar_editor(row, entities, f"review_{row['id']}", service=service)
+        render_action_journal(service, row, f"review_act_{row['id']}")
     with editing, st.container(key="correction_panel"):
         st.subheader("Human confirmation")
         history = row["feedback_history"]

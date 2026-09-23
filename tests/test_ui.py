@@ -279,3 +279,85 @@ def test_gmail_controls_in_ui(workspace, monkeypatch):
     app2 = assert_clean(AppTest.from_file(str(APP), default_timeout=20).run())
     assert any("CONNECT GMAIL" in m.value for m in app2.markdown)
 
+
+def test_show_email_extended_metadata(monkeypatch):
+    from inboxlearn.presentation import show_email
+    captions = []
+    texts = []
+    expanders = []
+    
+    class DummyStreamlit:
+        @staticmethod
+        def caption(text):
+            captions.append(text)
+        @staticmethod
+        def text(text):
+            texts.append(text)
+        @staticmethod
+        def expander(label, expanded=False):
+            expanders.append(label)
+            class Ctx:
+                def __enter__(self): return self
+                def __exit__(self, *a): pass
+            return Ctx()
+
+    monkeypatch.setattr("inboxlearn.presentation.st", DummyStreamlit)
+    
+    mock_row = {
+        "id": 42,
+        "status": "needs_review",
+        "source_type": "eml",
+        "date_header": "2026-09-23T08:00:00Z",
+        "message_id": "<msg42@example.com>",
+        "in_reply_to": "<prev@example.com>",
+        "parser_warnings_json": '["Suspicious header", "Attachment skipped"]',
+        "subject": "Invoice for services",
+        "sender": "billing@corp.com",
+        "body": "Please find attached the invoice."
+    }
+    show_email(mock_row)
+    assert any("SOURCE: EML" in c for c in captions)
+    assert any("DATE: 2026-09-23T08:00:00Z" in c for c in captions)
+    assert any("Parser warnings (2)" in e for e in expanders)
+    assert any("Technical headers" in e for e in expanders)
+    assert any("Subject: Invoice for services" in t for t in texts)
+
+
+def test_action_journal_service_and_ui_flow(workspace):
+    from inboxlearn.demo import demo_data_path
+    workspace.classify_upload(demo_data_path("demo_feedback.csv").read_bytes())
+    inbox = workspace.repo.inbox_rows()
+    email_id = inbox[0]["id"]
+
+    # 1. Stage an action
+    action_id = workspace.stage_action(email_id, "follow_up", {"description": "Follow up with sender"})
+    actions = workspace.email_actions(email_id)
+    assert len(actions) == 1
+    assert actions[0]["status"] == "staged"
+    assert actions[0]["action_type"] == "follow_up"
+
+    # 2. Execute the action
+    workspace.execute_action(action_id)
+    actions = workspace.email_actions(email_id)
+    assert actions[0]["status"] == "executed"
+    assert actions[0]["executed_at"] is not None
+
+    # 3. Revert the action
+    workspace.revert_action(action_id)
+    actions = workspace.email_actions(email_id)
+    assert actions[0]["status"] == "reverted"
+
+    # 4. Verify UI renders without errors when action journal is populated
+    app = assert_clean(AppTest.from_file(str(APP), default_timeout=20).run())
+    assert any("Action journal" in e.label for e in app.expander)
+
+
+def test_inbox_table_source_and_date_columns(workspace):
+    from inboxlearn.demo import demo_data_path
+    workspace.classify_upload(demo_data_path("demo_feedback.csv").read_bytes())
+    app = assert_clean(AppTest.from_file(str(APP), default_timeout=20).run())
+    df = next(d.value for d in app.dataframe if "Subject" in d.value.columns)
+    assert "Source" in df.columns
+    assert "Date" in df.columns
+    assert "CSV" in df["Source"].values
+

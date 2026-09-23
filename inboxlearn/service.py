@@ -189,6 +189,22 @@ class InboxLearnService:
         """Get import batch listing."""
         return self.repo.import_batches()
 
+    def stage_action(self, email_id: int, action_type: str, payload: dict | None = None) -> int:
+        """Stage an action in the journal."""
+        return self.repo.save_action(email_id, action_type, payload or {})
+
+    def execute_action(self, action_id: int) -> None:
+        """Mark a staged action as executed."""
+        self.repo.execute_action(action_id)
+
+    def revert_action(self, action_id: int) -> None:
+        """Mark an action as reverted."""
+        self.repo.revert_action(action_id)
+
+    def email_actions(self, email_id: int) -> list[dict]:
+        """Get action journal entries for an email as plain dicts."""
+        return [dict(row) for row in self.repo.actions_for_email(email_id)]
+
     def gmail_status(self, storage_dir: str = "runtime/credentials") -> dict:
         """Check status of local Gmail connection."""
         from .gmail import CredentialStore, is_gmail_enabled
