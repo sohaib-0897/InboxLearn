@@ -164,6 +164,17 @@ class Repository:
             
             conn.execute("INSERT INTO schema_migrations (version) VALUES (1)")
 
+        conn.execute("BEGIN IMMEDIATE")
+        try:
+            if not conn.execute("SELECT 1 FROM schema_migrations WHERE version=2").fetchone():
+                conn.execute("ALTER TABLE action_journal ADD COLUMN due_date TEXT")
+                conn.execute("CREATE TABLE batch_confirmations (token TEXT PRIMARY KEY, payload TEXT NOT NULL)")
+                conn.execute("INSERT INTO schema_migrations VALUES (2)")
+            conn.commit()
+        except Exception:
+            conn.rollback()
+            raise
+
     @contextmanager
     def training_transaction(self) -> Iterator[sqlite3.Connection]:
         """Hold the SQLite write lock for the complete model build and version save."""
@@ -227,8 +238,12 @@ class Repository:
         return self._all(
             f"""SELECT e.*, p.model_version_id, p.category, p.priority,
                     p.category_confidence, p.priority_confidence, p.status,
-                    p.created_at AS prediction_created_at
+                    p.created_at AS prediction_created_at,
+                    f.id AS feedback_id, COALESCE(f.category,p.category) AS effective_category,
+                    COALESCE(f.priority,p.priority) AS effective_priority,
+                    CASE WHEN f.id IS NULL THEN 'Model prediction' ELSE 'Human confirmed' END AS label_source
                 FROM emails e JOIN predictions p ON p.email_id=e.id AND p.is_original=1
+                LEFT JOIN feedback f ON f.id=(SELECT MAX(id) FROM feedback WHERE email_id=e.id)
                 {where} ORDER BY e.id DESC"""
         )
 
@@ -346,7 +361,10 @@ class Repository:
                       p.category AS predicted_category, p.priority AS predicted_priority,
                       p.category_confidence, p.priority_confidence, p.model_version_id,
                       p.status,
-                      f.category AS corrected_category, f.priority AS corrected_priority
+                      f.category AS corrected_category, f.priority AS corrected_priority,
+                      COALESCE(f.category,p.category) AS effective_category,
+                      COALESCE(f.priority,p.priority) AS effective_priority,
+                      CASE WHEN f.id IS NULL THEN 'Model prediction' ELSE 'Human confirmed' END AS label_source
                FROM emails e JOIN predictions p ON p.email_id=e.id AND p.is_original=1
                LEFT JOIN feedback f ON f.id=(SELECT MAX(id) FROM feedback WHERE email_id=e.id)
                ORDER BY e.id"""
@@ -428,13 +446,13 @@ class Repository:
         """Get all extracted entities for an email."""
         return self._all("SELECT * FROM extracted_entities WHERE email_id=? ORDER BY id", (email_id,))
 
-    def save_action(self, email_id: int, action_type: str, payload: dict) -> int:
+    def save_action(self, email_id: int, action_type: str, payload: dict, due_date: str | None = None) -> int:
         """Stage an action in the journal."""
         with closing(self._connect()) as conn:
             cursor = conn.execute(
-                """INSERT INTO action_journal(email_id, action_type, payload_json, status, created_at)
-                   VALUES (?,?,?,?,?)""",
-                (email_id, action_type, json.dumps(payload), 'staged', utc_now())
+                """INSERT INTO action_journal(email_id, action_type, payload_json, status, created_at, due_date)
+                   VALUES (?,?,?,?,?,?)""",
+                (email_id, action_type, json.dumps(payload), 'staged', utc_now(), due_date)
             )
             conn.commit()
             return int(cursor.lastrowid)

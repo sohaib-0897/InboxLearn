@@ -1,5 +1,6 @@
 """Native Streamlit presentation over the existing InboxLearn service."""
 import json
+import uuid
 from datetime import date, datetime, time as dt_time
 from math import ceil
 from pathlib import Path
@@ -21,7 +22,7 @@ from inboxlearn.presentation import (
 
 st.set_page_config(page_title="InboxLearn", page_icon="✉", layout="wide", initial_sidebar_state="collapsed")
 
-APP_VERSION = "2.2.0"
+APP_VERSION = "2.3.0"
 
 # Ensure InboxLearnService class definition has gmail and action journal methods even if an older instance was in memory
 if not hasattr(InboxLearnService, "gmail_status"):
@@ -194,56 +195,97 @@ def render_calendar_editor(row: dict, entities: list[dict], key_prefix: str, ser
                 st.error(f"Cannot generate .ics: {exc}")
 
 
+def open_message(email_id: int, tab: str) -> None:
+    st.session_state["workspace_tabs"] = tab
+    if tab == "Review queue":
+        st.session_state.update(include_confident=True, review_cat_filter="All categories",
+                                review_pri_filter="All priorities", review_batch_filter="All batches",
+                                next_review_email=email_id)
+    else:
+        st.session_state.update(inbox_search="", inbox_category="All categories", inbox_priority="All priorities",
+                                inbox_status="All statuses", inbox_batch="All batches", read_email=email_id)
+
+
+def action_controls(service, act, key):
+    try:
+        if act["status"] == "staged":
+            done, cancel = st.columns(2)
+            if done.button("Mark done", key=f"{key}_done"):
+                service.execute_action(act["id"])
+                flash("Follow-up marked done.")
+            if cancel.button("Cancel", key=f"{key}_cancel"):
+                service.revert_action(act["id"])
+                flash("Follow-up cancelled.")
+        elif st.button("Reopen", key=f"{key}_reopen"):
+            service.reopen_action(act["id"])
+            flash("Follow-up reopened.")
+    except Exception as exc:
+        st.error(f"Could not update follow-up: {exc}")
+
+
+def render_today(service):
+    section("00", "Today", "Your reviews and follow-ups, in one place.")
+    if not service.repo.inbox_rows():
+        st.info("Start by importing a CSV, .eml, or .mbox file in Upload / Inbox, or try the demonstration sample.")
+        if st.button("Classify demonstration sample", key="today_demo"):
+            classify(service, demo_data_path("demo_feedback.csv").read_bytes(), "demonstration")
+        return
+    pending = service.review_rows()
+    st.subheader(f"Pending reviews ({len(pending)})")
+    if not pending:
+        st.caption("No uncertain messages await review.")
+    for row in pending:
+        st.button(message_label(row), key=f"today_review_{row['id']}", on_click=open_message,
+                  args=(row["id"], "Review queue"))
+    actions = service.follow_ups()
+    for group in ("Overdue", "Today", "Upcoming", "No due date", "History"):
+        items = [a for a in actions if a['group'] == group]
+        with st.expander(f"{group} ({len(items)})", expanded=group != "History"):
+            if not items:
+                st.caption("Nothing here.")
+            for act in items:
+                payload = json.loads(act['payload_json'])
+                st.write(payload.get('description') or payload.get('summary') or act['action_type'])
+                st.caption(f"{act['sender']} | {act['subject']} | Due: {act['due_date'] or 'No due date'} | "
+                           + {"staged": "Pending", "executed": "Done", "reverted": "Cancelled"}[act['status']])
+                st.button("Open email", key=f"today_open_{act['id']}", on_click=open_message,
+                          args=(act['email_id'], "Upload / Inbox"))
+                action_controls(service, act, f"today_{act['id']}")
+
+
 def render_action_journal(service: InboxLearnService, row: dict, key_prefix: str) -> None:
-    """Render the Action Journal for an email: audit history, staging actions, and marking execution/reversion."""
     email_id = int(row["id"])
     actions = service.email_actions(email_id)
     with st.expander(f"Action journal ({len(actions)})", expanded=bool(actions)):
-        st.markdown("**ACTION JOURNAL**")
-        st.caption("Stage suggested actions, mark completion, or cancel/revert them. All actions are local audit records.")
-
-        if actions:
-            st.markdown("**Action History:**")
-            for act in actions:
-                st_icon = {"staged": "⏳", "executed": "✅", "reverted": "↩️"}.get(act["status"], "•")
-                act_col1, act_col2 = st.columns([3, 2])
-                with act_col1:
-                    payload = json.loads(act["payload_json"]) if isinstance(act.get("payload_json"), str) else act.get("payload_json", {})
-                    desc = payload.get("description") or act["action_type"]
-                    st.write(f"{st_icon} **{act['action_type']}**: {desc}")
-                    exec_info = f" · Executed: {act.get('executed_at', '')}" if act.get("executed_at") else ""
-                    st.caption(f"Status: {act['status'].upper()} · Staged: {act['created_at']}{exec_info}")
-                with act_col2:
-                    if act["status"] == "staged":
-                        c_exec, c_rev = st.columns(2)
-                        with c_exec:
-                            if st.button("Mark done", key=f"{key_prefix}_act_exec_{act['id']}"):
-                                service.execute_action(int(act["id"]))
-                                flash(f"Action #{act['id']} marked as executed.")
-                        with c_rev:
-                            if st.button("Cancel", key=f"{key_prefix}_act_rev_{act['id']}"):
-                                service.revert_action(int(act["id"]))
-                                flash(f"Action #{act['id']} cancelled.")
-                    elif act["status"] == "executed":
-                        if st.button("Revert", key=f"{key_prefix}_act_rev_{act['id']}"):
-                            service.revert_action(int(act["id"]))
-                            flash(f"Action #{act['id']} reverted.")
-            st.markdown("---")
-
-        st.markdown("**Stage an Action:**")
-        suggested = _row_val(row, "suggested_action") or "Review email content"
-        stage_col1, stage_col2 = st.columns([3, 1])
-        with stage_col1:
-            action_desc = st.text_input("Action description", value=suggested, key=f"{key_prefix}_new_action_desc")
-        with stage_col2:
-            action_type = st.selectbox("Action type", ["suggested_next", "follow_up", "archive", "calendar_event", "custom"], key=f"{key_prefix}_new_action_type")
-
+        st.caption("Follow-ups are local records. Reminders appear when this workspace is open.")
+        for act in actions:
+            payload = json.loads(act['payload_json'])
+            st.write(payload.get('description') or payload.get('summary') or act['action_type'])
+            st.caption({"staged": "Pending", "executed": "Done", "reverted": "Cancelled"}[act['status']])
+            action_controls(service, act, f"{key_prefix}_{act['id']}")
+            with st.form(f"{key_prefix}_date_form_{act['id']}"):
+                due = st.date_input("Due date (optional)", value=date.fromisoformat(act['due_date']) if act['due_date'] else None,
+                                    key=f"{key_prefix}_date_{act['id']}")
+                if st.form_submit_button("Save due date"):
+                    try:
+                        service.edit_action_due_date(act['id'], due)
+                        flash("Due date saved.")
+                    except Exception as exc:
+                        st.error(f"Could not save due date: {exc}")
+        # Key the default suggestion to the effective category so a correction updates it.
+        action_desc = st.text_input("Action description", value=row.get('suggested_action', 'Review email content'),
+                                   key=f"{key_prefix}_new_action_desc_{row.get('effective_category', '')}")
+        action_type = st.selectbox("Action type", ["follow_up", "suggested_next", "archive", "calendar_event", "custom"], key=f"{key_prefix}_new_action_type")
+        due = st.date_input("Due date (optional)", value=None, key=f"{key_prefix}_new_due")
+        st.caption("Choose a date to confirm a deadline, or leave it empty. Extracted dates never create follow-ups automatically.")
         if st.button("Stage action", key=f"{key_prefix}_btn_stage_action"):
-            if action_desc.strip():
-                aid = service.stage_action(email_id, action_type, {"description": action_desc.strip()})
+            try:
+                if not action_desc.strip():
+                    raise ValueError("Please provide an action description.")
+                aid = service.stage_action(email_id, action_type, {"description": action_desc.strip()}, due_date=due)
                 flash(f"Action #{aid} staged in Action Journal.")
-            else:
-                st.error("Please provide an action description.")
+            except Exception as exc:
+                st.error(f"Could not save follow-up: {exc}")
 
 
 
@@ -342,15 +384,17 @@ def render_upload(service: InboxLearnService) -> None:
         with query_col:
             query = st.text_input("Search subject, sender or body", key="inbox_search").casefold()
         with category_col:
-            category = st.selectbox("Predicted category", ["All categories", *CATEGORIES], key="inbox_category")
+            category = st.selectbox("Category", ["All categories", *CATEGORIES], key="inbox_category")
         with status_col:
             status = st.selectbox("Review status", ["All statuses", *STATUS_LABELS.values()], key="inbox_status")
+    priority_filter = st.selectbox("Priority", ["All priorities", *PRIORITIES], key="inbox_priority")
     if batch_options:
         batch_filter = st.selectbox("Import batch", batch_options, key="inbox_batch")
     else:
         batch_filter = "All batches"
     filtered = [r for r in rows if (not query or query in " ".join([r['subject'], r['body'], r['sender']]).casefold())
-                and (category == "All categories" or r["category"] == category)
+                and (category == "All categories" or r["effective_category"] == category)
+                and (priority_filter == "All priorities" or r["effective_priority"] == priority_filter)
                 and (status == "All statuses" or STATUS_LABELS[r["status"]] == status)
                 and (batch_filter == "All batches" or r.get("import_batch", "") == batch_filter)]
     listing, detail = st.columns([7, 4], gap="large")
@@ -362,8 +406,9 @@ def render_upload(service: InboxLearnService) -> None:
                 "Date": _row_val(r, "date_header") or "—",
                 "Source": (_row_val(r, "source_type") or "csv").upper(),
                 "Subject": r["subject"],
-                "Category": r["category"],
-                "Priority": r["priority"],
+                "Category": r["effective_category"],
+                "Priority": r["effective_priority"],
+                "Label source": r["label_source"],
                 "Category estimate": r["category_confidence"],
                 "Priority estimate": r["priority_confidence"],
                 "Status": STATUS_LABELS.get(_row_val(r, "status"), str(_row_val(r, "status"))),
@@ -382,6 +427,8 @@ def render_upload(service: InboxLearnService) -> None:
             selected_id = st.selectbox("Read message ID", list(labels), format_func=labels.get, key="read_email")
             row = next(r for r in filtered if r["id"] == selected_id)
             show_email(row)
+            st.caption(f"{row['label_source']}: {row['effective_category']} / {row['effective_priority']}")
+            st.button("Review this message", key="review_from_inbox", on_click=open_message, args=(row["id"], "Review queue"))
             original_prediction(row)
             # Extracted entities and interactive calendar editor
             entities = service.entities_for_email(int(row["id"]))
@@ -409,15 +456,12 @@ def render_review(service: InboxLearnService) -> None:
         with col_b:
             review_batch = st.selectbox("Batch filter", batch_options if batch_options else ["All batches"], key="review_batch_filter")
 
-    all_rows = service.review_rows(include_confident=include_confident, order=order)
+    queue_options = dict(include_confident=include_confident, order=order, category=review_cat, priority=review_pri, import_batch=review_batch)
     st.caption("Lowest confidence uses the smaller category or priority estimate; ties use message ID.")
     if st.session_state.pop("review_complete", False):
         st.success("Review complete: no unresolved messages remain in this queue.")
 
-    # Apply filters
-    rows = [r for r in all_rows if (review_cat == "All categories" or r["category"] == review_cat)
-            and (review_pri == "All priorities" or r["priority"] == review_pri)
-            and (review_batch == "All batches" or r.get("import_batch", "") == review_batch)]
+    rows = service.review_rows(**queue_options)
 
     if not rows:
         st.info("The review queue is empty for these filters. Clear filters or check 'Include confident predictions' to review other messages.")
@@ -441,19 +485,27 @@ def render_review(service: InboxLearnService) -> None:
             preview_records = [{
                 "ID": r["id"],
                 "Subject": r["subject"][:65],
-                "Current Prediction": f"{r['category']} / {r['priority']}",
+                "Displayed labels": f"{r['effective_category']} / {r['effective_priority']}",
                 "Confirmed Category": batch_target_cat,
                 "Confirmed Priority": batch_target_pri,
             } for r in selected_items]
             st.markdown(f"**Previewing {len(selected_items)} message(s) to confirm:**")
             st.dataframe(pd.DataFrame(preview_records), hide_index=True, width="stretch")
 
-            if st.button(f"Confirm {len(selected_items)} selected message(s)", type="primary", key="btn_execute_batch_confirm"):
-                count_saved = 0
-                for mid in selected_batch_ids:
-                    service.save_feedback(int(mid), batch_target_cat, batch_target_pri)
-                    count_saved += 1
-                flash(f"Batch confirmed {count_saved} message(s) as {batch_target_cat} / {batch_target_pri}. Prepare a candidate in Train / Versions.")
+            snapshot = {"rows": [{"id": r["id"], "feedback_id": r["feedback_id"]} for r in selected_items],
+                        "category": batch_target_cat, "priority": batch_target_pri, "filters": queue_options}
+            confirming = st.button(f"Confirm {len(selected_items)} selected message(s)", type="primary", key="btn_execute_batch_confirm")
+            prior = st.session_state.get("batch_preview")
+            if confirming:
+                try:
+                    if not prior or prior["snapshot"] != snapshot:
+                        raise ValueError("Selection or feedback changed. Refresh the preview before confirming.")
+                    count_saved = service.confirm_batch(snapshot["rows"], batch_target_cat, batch_target_pri, prior["token"])
+                    flash(f"Batch confirmed {count_saved} message(s). Model unchanged.")
+                except Exception as exc:
+                    st.error(f"Could not save batch: {exc}")
+            if not confirming or st.button("Refresh preview", key="refresh_batch"):
+                st.session_state["batch_preview"] = {"snapshot": snapshot, "token": str(uuid.uuid4())}
 
     labels = {r["id"]: message_label(r) for r in rows}
     next_id = st.session_state.pop("next_review_email", None)
@@ -466,6 +518,7 @@ def render_review(service: InboxLearnService) -> None:
     reading, editing = st.columns([3, 2], gap="large")
     with reading:
         show_email(row)
+        st.caption(f"{row['label_source']}: {row['effective_category']} / {row['effective_priority']}")
         original_prediction(row)
         st.markdown("**ROUTING RECORD**")
         if row["status"] == "needs_review":
@@ -476,14 +529,14 @@ def render_review(service: InboxLearnService) -> None:
             st.write("Automatically classified: both confidence estimates met their thresholds at import.")
         st.caption("Confidence is an uncalibrated model estimate.")
         st.write("Suggested next action: " + row["suggested_action"])
-        st.caption("Suggestion based on the original category. No action is executed.")
+        st.caption("Suggestion based on the displayed category. No action is executed.")
         # Extracted entities and interactive calendar editor
         entities = service.entities_for_email(int(row["id"]))
         render_calendar_editor(row, entities, f"review_{row['id']}", service=service)
         render_action_journal(service, row, f"review_act_{row['id']}")
     with editing, st.container(key="correction_panel"):
         st.subheader("Human confirmation")
-        history = row["feedback_history"]
+        history = [dict(h) for h in service.repo.feedback_for_email(int(row["id"]))]
         current = history[-1] if history else row
         if history:
             st.caption(f"Latest correction #{current['id']} · {current['category']} / {current['priority']}")
@@ -497,8 +550,7 @@ def render_review(service: InboxLearnService) -> None:
                 try:
                     correction_id, created = service.save_feedback(int(row["id"]), category, priority)
                     if save_next:
-                        unresolved = [r for r in service.review_rows(include_confident=include_confident, order=order)
-                                      if r["status"] != "corrected"]
+                        unresolved = [r for r in service.review_rows(**queue_options, unresolved=True)]
                         if unresolved:
                             st.session_state["next_review_email"] = unresolved[0]["id"]
                         else:
@@ -725,10 +777,12 @@ def main() -> None:
             st.write("Seed, validation, feedback examples and held-out evaluation files are synthetic demonstration data. Human confirmation is required before feedback training.")
             st.write("Actions are suggestions only. No sending, deletion, payments or external integrations.")
             st.text(f"Local database: {settings.db_path}")
-    upload_tab, review_tab, version_tab, evaluation_tab = st.tabs(
-        ["Upload / Inbox", "Review queue", "Train / Versions", "Evaluation"],
+    today_tab, upload_tab, review_tab, version_tab, evaluation_tab = st.tabs(
+        ["Today", "Upload / Inbox", "Review queue", "Train / Versions", "Evaluation"],
         key="workspace_tabs", on_change="rerun",
     )
+    with today_tab:
+        render_today(service)
     with upload_tab:
         render_upload(service)
     with review_tab:

@@ -31,7 +31,7 @@ def click(app, label):
 
 def test_empty_states_and_classification_failure(workspace, monkeypatch):
     app = assert_clean(AppTest.from_file(str(APP), default_timeout=20).run())
-    assert len(app.tabs) == 4
+    assert len(app.tabs) == 5
     assert app.button(key="train_model").disabled
     assert any("Not evaluated" in i.value for i in app.info)
     assert app.button(key="classify_csv").disabled
@@ -361,3 +361,60 @@ def test_inbox_table_source_and_date_columns(workspace):
     assert "Date" in df.columns
     assert "CSV" in df["Source"].values
 
+
+
+def test_daily_navigation_due_date_and_reopen(workspace):
+    from datetime import date
+    app = assert_clean(AppTest.from_file(str(APP), default_timeout=20).run())
+    assert app.session_state['workspace_tabs'] == 'Today'
+    app.button(key='today_demo').click().run()
+    mid = workspace.review_rows(include_confident=True)[0]['id']
+    aid = workspace.stage_action(mid, 'follow_up', {'description': 'Call sender'}, date.today())
+    app.run()
+    app.button(key=f'today_open_{aid}').click().run()
+    assert_clean(app)
+    assert app.session_state['workspace_tabs'] == 'Upload / Inbox'
+    assert app.selectbox(key='read_email').value == mid
+    app.button(key='review_from_inbox').click().run()
+    assert app.session_state['workspace_tabs'] == 'Review queue'
+    assert app.selectbox(key='review_email').value == mid
+    app.button(key=f'today_{aid}_done').click().run()
+    assert workspace.email_actions(mid)[0]['status'] == 'executed'
+    app.button(key=f'today_{aid}_reopen').click().run()
+    assert workspace.email_actions(mid)[0]['status'] == 'staged'
+
+
+def test_save_next_respects_all_filters(workspace):
+    from inboxlearn.demo import demo_data_path
+    workspace.classify_upload(demo_data_path('demo_feedback.csv').read_bytes())
+    with workspace.repo.training_transaction() as conn:
+        conn.execute("UPDATE predictions SET category='bills', priority='high', status='needs_review'")
+        conn.execute("UPDATE emails SET import_batch=CASE WHEN id IN (1,2) THEN 'selected' ELSE 'other' END")
+    app = assert_clean(AppTest.from_file(str(APP), default_timeout=20).run())
+    app.selectbox(key='review_cat_filter').select('bills').run()
+    app.selectbox(key='review_pri_filter').select('high').run()
+    app.selectbox(key='review_batch_filter').select('selected').run()
+    expected = workspace.review_rows(category='bills', priority='high', import_batch='selected')
+    for row in expected:
+        assert app.selectbox(key='review_email').value == row['id']
+        click(app, 'Save and next')
+    assert any('Review complete' in x.value for x in app.success)
+    assert len(workspace.repo.latest_feedback()) == 2
+    assert not any(s.key == 'review_email' for s in app.selectbox)
+
+
+def test_stale_batch_requires_refresh(workspace):
+    from inboxlearn.demo import demo_data_path
+    workspace.classify_upload(demo_data_path('demo_feedback.csv').read_bytes())
+    app = assert_clean(AppTest.from_file(str(APP), default_timeout=20).run())
+    app.checkbox(key='include_confident').check().run()
+    app.multiselect(key='batch_confirm_selection').select(1).select(2).run()
+    workspace.save_feedback(1, 'spam', 'high')
+    app.button(key='btn_execute_batch_confirm').click().run()
+    assert_clean(app)
+    assert any('Refresh the preview' in e.value for e in app.error)
+    assert len(workspace.repo.latest_feedback()) == 1
+    app.button(key='refresh_batch').click().run()
+    app.button(key='btn_execute_batch_confirm').click().run()
+    assert_clean(app)
+    assert len(workspace.repo.latest_feedback()) == 2

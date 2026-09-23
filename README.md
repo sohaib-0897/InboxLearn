@@ -17,8 +17,9 @@ An email classifier will make mistakes. InboxLearn is a self learning AI agent t
 ## What it does
 
 - **Multi-format intake:** Ingests emails from CSV, single `.eml` files, `.mbox` archives, and a local read-only Gmail API connector.
+- **Today & Follow-ups:** Start with pending reviews and local follow-ups grouped by Overdue, Today, Upcoming, and No due date. Confirm optional deadlines, mark done, cancel, or reopen; completed and cancelled items live in History.
 - **Triage & Classification:** Classifies incoming messages into five categories and three priorities; uncertain predictions route to the review queue.
-- **Review Desk & Batch Confirmation:** Review with **Save and next** or apply **Batch confirmation** to multi-selected messages; filter by category, priority, review state, and import batch.
+- **Review Desk & Batch Confirmation:** Human-confirmed labels immediately drive inbox/review filters and suggestions. **Save and next** stays inside the selected category, priority, and import batch. Batch confirmation validates the preview and saves all selected corrections in one transaction; stale previews require refresh. Original predictions and model identity remain available.
 - **Entity Awareness & Calendar Export:** Extracts dates, deadlines, monetary amounts, action items, and contacts. Interactive form lets users confirm title, date, time, and timezone before downloading an RFC 5545 `.ics` file.
 - **Human-in-the-loop Learning:** Learns only from human-confirmed feedback. New labels update incrementally; revisions trigger a clean rebuild from seed plus latest corrections.
 - **Safe Activation & Lineage:** Prepares immutable, inactive candidate models; before/after prediction comparison and held-out evaluation are required before activation. Rollback restores earlier versions instantly.
@@ -82,7 +83,7 @@ Uploads require UTF-8 CSV with `subject` and `body`; `sender` is optional. Data 
 
 ## Verification
  
-The local verification completed **105 tests** across 10 test modules, an isolated dependency check, and the full Chrome workflow at **1440×1000** and **390×844** viewports. Tests cover real email parsers (.eml, .mbox), regex entity extraction, RFC 5545 calendar generation, V2 schema migrations, model updates, feedback revisions, concurrent candidate preparation, candidate activation gates, rollback, CSV validation, Gmail connector error paths, and native UI states through Streamlit AppTest.
+The local verification completed **115 tests** across 11 test modules, and the full Chrome workflow at **1440×1000** and **390×844** viewports. Tests cover real email parsers (.eml, .mbox), regex entity extraction, RFC 5545 calendar generation, V2 schema migrations, model updates, feedback revisions, concurrent candidate preparation, candidate activation gates, rollback, CSV validation, Gmail connector error paths, and native UI states through Streamlit AppTest.
 
 Every acceptance criterion from the expansion plan is reconciled in [`reports/COMPLETION_REPORT.md`](reports/COMPLETION_REPORT.md).
 
@@ -118,3 +119,11 @@ flowchart LR
 This is a local, single-user portfolio project. Independent real-world evaluation, calibrated confidence, authentication and physical-device accessibility testing remain future work. Model deserialization assumes a trusted local database. Detailed tradeoffs and operational instructions are in the [project guide](docs/PROJECT_GUIDE.md).
 
 Built by [Muhammad Sohaib Imran](https://github.com/sohaib-0897).
+
+## Daily workspace
+
+Start on **Today**. In an empty workspace, use the demonstration button or import CSV, `.eml`, or `.mbox` in **Upload / Inbox**. Open an email, choose **Review this message**, and confirm its labels. In its **Action journal**, enter a description and optional date, then choose **Stage action**. Find it on Today and choose **Mark done**. These steps do not change the active model.
+
+Deadlines are date-only and grouped using the local computer's date. Extracted dates never create follow-ups automatically. **Save due date** edits a deadline; clearing the date removes it. **Reopen** returns a Done or Cancelled item to Pending. Reminders are visible while the app is open; background notifications and Gmail writes are outside this release.
+
+Opening an existing database automatically adds nullable action deadlines transactionally. Existing action IDs, payloads, and states are retained. CSV exports retain their existing columns and append `effective_category`, `effective_priority`, and `label_source`. Navigation uses [native Streamlit tab state](https://docs.streamlit.io/develop/api-reference/layout/st.tabs).

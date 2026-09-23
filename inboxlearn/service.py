@@ -1,5 +1,5 @@
 import csv
-from datetime import datetime
+from datetime import date, datetime
 import hashlib
 import importlib.metadata
 import io
@@ -9,7 +9,7 @@ from typing import Callable
 
 from .classifier import deserialize_bundle, serialize_bundle, train_bundle
 from .config import CATEGORIES, PRIORITIES, Settings
-from .db import Repository
+from .db import Repository, utc_now
 from .demo import load_demo_rows
 from .entities import extract_entities
 from .evaluation import assert_split_isolated, comparison_payload, dataset_hash, evaluate_bundle, tune_review_thresholds
@@ -189,9 +189,60 @@ class InboxLearnService:
         """Get import batch listing."""
         return self.repo.import_batches()
 
-    def stage_action(self, email_id: int, action_type: str, payload: dict | None = None) -> int:
+    def stage_action(self, email_id: int, action_type: str, payload: dict | None = None, due_date=None) -> int:
         """Stage an action in the journal."""
-        return self.repo.save_action(email_id, action_type, payload or {})
+        return self.repo.save_action(email_id, action_type, payload or {}, self._due_date(due_date))
+
+    @staticmethod
+    def _due_date(value):
+        return date.fromisoformat(str(value)).isoformat() if value is not None else None
+
+    def edit_action_due_date(self, action_id: int, due_date=None) -> None:
+        value = self._due_date(due_date)
+        with self.repo.training_transaction() as conn:
+            if not conn.execute("UPDATE action_journal SET due_date=? WHERE id=?", (value, action_id)).rowcount:
+                raise ValueError("Action does not exist.")
+
+    def reopen_action(self, action_id: int) -> None:
+        with self.repo.training_transaction() as conn:
+            if not conn.execute("UPDATE action_journal SET status='staged', executed_at=NULL WHERE id=?", (action_id,)).rowcount:
+                raise ValueError("Action does not exist.")
+
+    def follow_ups(self, *, today=None) -> list[dict]:
+        today = (today or date.today()).isoformat()
+        rows = [dict(r) for r in self.repo._all("""SELECT a.*, e.subject, e.sender FROM action_journal a
+            JOIN emails e ON e.id=a.email_id ORDER BY a.due_date IS NULL, a.due_date, a.id""")]
+        for row in rows:
+            due = row['due_date']
+            row['group'] = ('History' if row['status'] != 'staged' else 'No due date' if not due
+                            else 'Overdue' if due < today else 'Today' if due == today else 'Upcoming')
+        return rows
+
+    def confirm_batch(self, preview: list[dict], category: str, priority: str, token: str) -> int:
+        if category not in CATEGORIES or priority not in PRIORITIES or not preview:
+            raise ValueError("Select messages and supported labels.")
+        if len({r['id'] for r in preview}) != len(preview):
+            raise ValueError("Duplicate messages in preview.")
+        payload = json.dumps([preview, category, priority], sort_keys=True)
+        with self.repo.training_transaction() as conn:
+            prior = conn.execute("SELECT payload FROM batch_confirmations WHERE token=?", (token,)).fetchone()
+            if prior:
+                if prior['payload'] != payload:
+                    raise ValueError("Selection changed. Refresh the preview.")
+                return len(preview)
+            for row in preview:
+                latest = conn.execute("SELECT MAX(id) FROM feedback WHERE email_id=?", (row['id'],)).fetchone()[0]
+                if latest != row['feedback_id'] or not conn.execute("SELECT 1 FROM emails WHERE id=?", (row['id'],)).fetchone():
+                    raise ValueError("Feedback changed. Refresh the preview.")
+            for row in preview:
+                previous = conn.execute("SELECT * FROM feedback WHERE id=?", (row['feedback_id'],)).fetchone()
+                if previous and previous['category'] == category and previous['priority'] == priority:
+                    continue
+                conn.execute("INSERT INTO feedback(email_id,category,priority,replaces_feedback_id,created_at) VALUES (?,?,?,?,?)",
+                             (row['id'], category, priority, row['feedback_id'], utc_now()))
+                conn.execute("UPDATE predictions SET status='corrected' WHERE email_id=? AND is_original=1", (row['id'],))
+            conn.execute("INSERT INTO batch_confirmations VALUES (?,?)", (token, payload))
+        return len(preview)
 
     def execute_action(self, action_id: int) -> None:
         """Mark a staged action as executed."""
@@ -268,13 +319,17 @@ class InboxLearnService:
             raise ValueError("Feedback must use one of the supported categories and priorities.")
         return self.repo.save_feedback(email_id, category, priority)
 
-    def review_rows(self, *, include_confident: bool = False, order: str = "Lowest confidence first") -> list[dict]:
+    def review_rows(self, *, include_confident: bool = False, order: str = "Lowest confidence first",
+                    category="All categories", priority="All priorities", import_batch="All batches", unresolved=False) -> list[dict]:
         result = []
         for raw in self.repo.inbox_rows(review_only=False, include_confident=include_confident):
             row = _row_dict(raw)
-            feedback = self.repo.feedback_for_email(int(row["id"]))
-            row["feedback_history"] = [_row_dict(item) for item in feedback]
-            row["suggested_action"] = ACTION_SUGGESTIONS[row["category"]]
+            if ((category != "All categories" and row['effective_category'] != category)
+                or (priority != "All priorities" and row['effective_priority'] != priority)
+                or (import_batch != "All batches" and row['import_batch'] != import_batch)
+                or (unresolved and row['feedback_id'] is not None)):
+                continue
+            row["suggested_action"] = ACTION_SUGGESTIONS[row["effective_category"]]
             row["routing_reason"] = self.routing_reason(row)
             result.append(row)
         if order == "Newest first":
@@ -482,6 +537,7 @@ class InboxLearnService:
         fields = [
             "id", "subject", "body", "sender", "source", "created_at", "predicted_category", "predicted_priority",
             "category_confidence", "priority_confidence", "model_version_id", "status", "corrected_category", "corrected_priority",
+            "effective_category", "effective_priority", "label_source",
         ]
 
         def safe(value) -> str:

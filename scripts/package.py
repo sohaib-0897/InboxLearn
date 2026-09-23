@@ -24,7 +24,7 @@ def main():
     files.extend(ROOT / "data" / f"demo_{name}.csv" for name in ("seed", "feedback", "validation", "eval"))
     files.extend(ROOT / "docs" / "screenshots" / f"{profile}-{name}.png"
                  for profile in ("desktop", "mobile")
-                 for name in ("inbox", "review", "candidate", "prediction-changes", "evaluation", "matrices", "versions"))
+                 for name in ("today-empty", "today", "inbox", "review", "candidate", "prediction-changes", "evaluation", "matrices", "versions"))
     for folder, pattern in [("inboxlearn", "*.py"), ("tests", "*.py"), ("scripts", "*.py"), ("assets", "*.css"), ("data", "*.md")]:
         files.extend(sorted((ROOT / folder).glob(pattern)))
     archive_path = ROOT / "InboxLearn.zip"

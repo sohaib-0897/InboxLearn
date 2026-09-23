@@ -34,9 +34,11 @@ def no_overflow(page):
 
 
 def settled(page):
+    # Allow tab-triggered reruns to arrive before checking that rendering finished.
+    page.wait_for_timeout(300)
     expect(page.get_by_test_id("stStatusWidget")).to_have_count(0)
     expect(page.get_by_role("button", name="Stop", exact=True)).to_have_count(0)
-    expect(page.get_by_role("tab")).to_have_count(4)
+    expect(page.get_by_role("tab")).to_have_count(5)
 
 
 def frame_section(page, heading):
@@ -75,6 +77,10 @@ def run_browser(url, profile):
         expect(page.get_by_role("heading", name="InboxLearn", exact=True)).to_be_visible()
         settled(page)
         assert page.locator(".np-kicker").bounding_box()["y"] >= 56
+        expect(page.get_by_role("tab", name="Today", exact=True)).to_have_attribute("aria-selected", "true")
+        page.screenshot(path=str(OUT / f"{profile}-today-empty.png"), full_page=True)
+        page.get_by_role("tab", name="Upload / Inbox", exact=True).click()
+        settled(page)
         expect(page.get_by_role("button", name="Classify CSV", exact=True)).to_be_disabled()
         no_overflow(page)
         page.screenshot(path=str(OUT / f"{profile}-empty.png"), full_page=True)
@@ -91,7 +97,7 @@ def run_browser(url, profile):
         page.keyboard.press("Tab")
         focus = page.evaluate("""() => {const e=document.activeElement; const s=getComputedStyle(e); return {tag:e.tagName, outline:s.outlineStyle, width:s.outlineWidth};}""")
         assert focus["outline"] != "none" and focus["width"] != "0px", focus
-        category = page.get_by_role("combobox", name="Predicted category")
+        category = page.get_by_role("combobox", name="Category", exact=True)
         category.click()
         expect(page.get_by_role("option", name="bills", exact=True)).to_be_visible()
         page.screenshot(path=str(OUT / f"{profile}-dropdown.png"))
@@ -120,6 +126,39 @@ def run_browser(url, profile):
         expect(page.get_by_text("Review complete: no unresolved messages remain in this queue.", exact=True)).to_be_visible()
         frame_section(page, "The review desk" if profile == "desktop" else "Human confirmation")
         page.screenshot(path=str(OUT / f"{profile}-review.png"), full_page=True)
+        # Schedule a follow-up in the reading pane, then navigate and complete it on Today.
+        page.get_by_role("tab", name="Upload / Inbox", exact=True).click()
+        settled(page)
+        journal = page.get_by_role("tabpanel", name="Upload / Inbox", exact=True).get_by_test_id("stExpander").filter(has_text="Action journal (")
+        journal.locator('summary').click()
+        journal.get_by_role("textbox", name="Action description", exact=True).fill("Follow up with sender")
+        due = journal.get_by_test_id("stDateInput").locator("input")
+        due.fill("2026-09-23")
+        due.press("Enter")
+        journal.get_by_role("button", name="Stage action", exact=True).click()
+        expect(page.get_by_text("staged in Action Journal", exact=False)).to_be_visible()
+        page.get_by_role("tab", name="Today", exact=True).click()
+        settled(page)
+        expect(page.get_by_role("tabpanel", name="Today", exact=True).get_by_text("Follow up with sender", exact=True)).to_be_visible()
+        frame_section(page, "Today")
+        page.screenshot(path=str(OUT / f"{profile}-today.png"), full_page=True)
+        page.get_by_role("button", name="Open email", exact=True).click()
+        expect(page.get_by_role("tab", name="Upload / Inbox", exact=True)).to_have_attribute("aria-selected", "true")
+        settled(page)
+        page.get_by_role("button", name="Review this message", exact=True).click()
+        expect(page.get_by_role("tab", name="Review queue", exact=True)).to_have_attribute("aria-selected", "true")
+        page.get_by_role("tab", name="Today", exact=True).click()
+        settled(page)
+        page.get_by_role("tabpanel", name="Today", exact=True).get_by_role("button", name="Mark done", exact=True).click()
+        expect(page.get_by_text("Follow-up marked done.", exact=True)).to_be_visible()
+        history = page.get_by_test_id("stExpander").filter(has_text="History (1)")
+        history.locator('summary').click()
+        history.get_by_role("button", name="Reopen", exact=True).click()
+        expect(page.get_by_role("tabpanel", name="Today", exact=True).get_by_role("button", name="Mark done", exact=True)).to_be_visible()
+        page.get_by_role("tabpanel", name="Today", exact=True).get_by_role("button", name="Cancel", exact=True).click()
+        expect(page.get_by_text("Follow-up cancelled.", exact=True)).to_be_visible()
+        settled(page)
+        no_overflow(page)
         page.get_by_role("tab", name="Train / Versions", exact=True).click()
         page.get_by_role("button", name="Prepare candidate", exact=True).click()
         expect(page.get_by_text("Prepared candidate v2 from v1. v1 remains active.", exact=False)).to_be_visible()
@@ -170,13 +209,13 @@ def run_browser(url, profile):
         expect(page.get_by_role("option", name="bills", exact=True)).to_be_visible()
         no_overflow(page)
         page.keyboard.press("Escape")
-        caption_style = page.get_by_text("Suggestion based on the original category.", exact=False).evaluate("""e => ({color:getComputedStyle(e).color, opacity:getComputedStyle(e.parentElement).opacity})""")
+        caption_style = page.get_by_text("Suggestion based on the displayed category.", exact=False).evaluate("""e => ({color:getComputedStyle(e).color, opacity:getComputedStyle(e.parentElement).opacity})""")
         assert caption_style == {"color": "rgb(82, 82, 82)", "opacity": "1"}, caption_style
         assert not errors, errors
         assert not external, external
         evidence = {"browser": browser.version, "viewport": viewport, "focus": focus,
                           "overflow": overflow_checks, "page_errors": errors, "external_requests": external,
-                          "workflow": "upload/classify/save and next/prepare/deduplicate/preview/evaluate/activate/rollback/reactivate passed",
+                          "workflow": "upload/classify/save and next/schedule/open email/review confirmed/done/reopen/cancel/prepare/deduplicate/preview/evaluate/activate/rollback/reactivate passed",
                           "data": "Only the shipped synthetic demonstration fixtures", "screenshots": "runtime/newsprint-qa"}
         print(json.dumps(evidence, indent=2))
         browser.close()
@@ -223,7 +262,7 @@ def capture_profile(profile, portfolio):
                 destination = ROOT / "docs" / "screenshots"
                 destination.mkdir(parents=True, exist_ok=True)
                 images = [f"{profile}-{name}.png" for name in (
-                    "inbox", "review", "candidate", "prediction-changes", "evaluation", "matrices", "versions")]
+                    "today-empty", "today", "inbox", "review", "candidate", "prediction-changes", "evaluation", "matrices", "versions")]
                 for name in images:
                     shutil.copyfile(OUT / name, destination / name)
                 evidence["screenshots"] = images
