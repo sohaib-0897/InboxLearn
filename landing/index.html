@@ -1,0 +1,745 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>InboxLearn — Human-in-the-Loop Email Triage Intelligence</title>
+  <meta name="description" content="A local-first, self-learning AI agent for email triage with incremental scikit-learn models, human-verified corrections, evaluation gates, and safe rollback.">
+  
+  <!-- Typography (Google Fonts with robust system fallbacks) -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&family=Lora:ital,wght@0,400;0,600;1,400&family=Playfair+Display:ital,wght@0,700;0,800;0,900;1,700&display=swap" rel="stylesheet">
+  
+  <!-- Stylesheet -->
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <!-- Accessible Skip Link -->
+  <a href="#main-content" class="sr-only">Skip to main content</a>
+
+  <!-- Top Broadsheet Ticker Bar -->
+  <div class="top-ticker" role="region" aria-label="System status bar">
+    <div class="container">
+      <div>
+        <span>EDITION: LOCAL RUNTIME</span> · 
+        <span>ARCHITECTURE: PYTHON 3.12 / SCIKIT-LEARN / SQLITE</span> · 
+        <span>RELEASE: v2.3.0</span>
+      </div>
+      <div>
+        <span>STATUS: ZERO EXTERNAL APIS REQUIRED</span> · 
+        <a href="https://github.com/sohaib-0897/InboxLearn" target="_blank" rel="noopener noreferrer">GITHUB REPO</a>
+      </div>
+    </div>
+  </div>
+
+  <!-- Header & Navigation -->
+  <header class="site-header" role="banner">
+    <div class="container header-inner">
+      <a href="#" class="brand" aria-label="InboxLearn Home">
+        <span class="brand-title">INBOXLEARN</span>
+        <span class="brand-tagline">Human-in-the-Loop Email Intelligence</span>
+      </a>
+
+      <!-- Desktop Navigation -->
+      <nav class="nav-desktop" aria-label="Primary navigation">
+        <a href="#how-it-works" class="nav-link">How It Works</a>
+        <a href="#product-preview" class="nav-link">Interactive Triage</a>
+        <a href="#learning-loop" class="nav-link">Learning Loop</a>
+        <a href="#capabilities" class="nav-link">Capabilities</a>
+        <a href="#trust-safety" class="nav-link">Safety & Trust</a>
+        <a href="#comparison" class="nav-link">Architecture</a>
+        <a href="../docs/PROJECT_GUIDE.md" class="nav-link">Documentation</a>
+      </nav>
+
+      <!-- Primary Action Buttons -->
+      <div class="header-actions">
+        <a href="http://localhost:8501" target="_blank" rel="noopener noreferrer" class="btn btn-primary btn-sm" title="Launch the local Streamlit workspace at http://localhost:8501">
+          <span>Open InboxLearn</span>
+          <span aria-hidden="true">→</span>
+        </a>
+        
+        <!-- Mobile Navigation Toggle -->
+        <button type="button" class="mobile-nav-toggle" id="mobileNavToggle" aria-label="Toggle navigation menu" aria-expanded="false">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="square" aria-hidden="true">
+            <line x1="3" y1="6" x2="21" y2="6"></line>
+            <line x1="3" y1="12" x2="21" y2="12"></line>
+            <line x1="3" y1="18" x2="21" y2="18"></line>
+          </svg>
+        </button>
+      </div>
+    </div>
+
+    <!-- Mobile Navigation Drawer -->
+    <nav class="mobile-nav-drawer" id="mobileNavDrawer" aria-label="Mobile navigation">
+      <div class="mobile-nav-links">
+        <a href="#how-it-works">How It Works</a>
+        <a href="#product-preview">Interactive Triage</a>
+        <a href="#learning-loop">Learning Loop</a>
+        <a href="#capabilities">Capabilities</a>
+        <a href="#trust-safety">Safety & Trust</a>
+        <a href="#comparison">Architecture</a>
+        <a href="../docs/PROJECT_GUIDE.md">Documentation</a>
+        <div style="padding-top: 16px;">
+          <a href="http://localhost:8501" target="_blank" rel="noopener noreferrer" class="btn btn-primary" style="width: 100%;">Open InboxLearn (Local App)</a>
+        </div>
+      </div>
+    </nav>
+  </header>
+
+  <!-- Main Content Area -->
+  <main id="main-content">
+
+    <!-- 1. Hero Section: The Broadsheet Lead -->
+    <section class="hero-section" aria-labelledby="hero-title">
+      <div class="container">
+        <!-- Editorial Metadata Strip -->
+        <div class="hero-meta-strip">
+          <div>
+            <span class="np-kicker--accent">DISPATCH 01</span> · LOCAL-FIRST EMAIL INTELLIGENCE · HUMAN VERIFIED
+          </div>
+          <div>
+            REVERSIBLE MACHINE LEARNING · NO PAID API DEPENDENCY
+          </div>
+        </div>
+
+        <div class="hero-grid">
+          <!-- Left Main Lead Column -->
+          <div class="hero-lead-col">
+            <h1 class="hero-headline" id="hero-title">
+              Your inbox gets smarter with every correction.
+            </h1>
+            <p class="hero-standfirst">
+              InboxLearn combines fast <strong>machine learning classification</strong> with rigorous <strong>human review</strong>. Instead of trusting a black-box model or relying on fragile static filters, operators inspect uncertain predictions, correct classifications, and train immutable candidate models—guarded by held-out evaluation before any weights go live.
+            </p>
+            <p style="font-size: 1.05rem; color: var(--np-secondary); line-height: 1.6;">
+              Engineered for engineers, students, and professionals handling job applications, billing invoices, coursework, and high-volume communication without shipping private correspondence to external cloud vendors.
+            </p>
+
+            <!-- Hero CTAs -->
+            <div class="hero-actions">
+              <a href="http://localhost:8501" target="_blank" rel="noopener noreferrer" class="btn btn-primary btn-lg">
+                <span>Open InboxLearn</span>
+                <span aria-hidden="true" style="font-family: var(--np-mono);">[PORT 8501]</span>
+              </a>
+              <a href="#learning-loop" class="btn btn-secondary btn-lg">
+                <span>See how it learns</span>
+                <span aria-hidden="true">↓</span>
+              </a>
+            </div>
+
+            <!-- Architectural Guarantee Badges -->
+            <div class="hero-badges-row">
+              <span class="badge badge-ink">SQLite Local Persistence</span>
+              <span class="badge badge-muted">Dual SGD Classifiers</span>
+              <span class="badge badge-accent">Human Gate Enforced</span>
+              <span class="badge badge-muted">Safe Rollback Engine</span>
+              <span class="badge badge-muted">RFC 5545 .ICS Export</span>
+            </div>
+          </div>
+
+          <!-- Right Sidebar / Broadsheet Ledger Aside -->
+          <aside class="hero-aside-card" aria-label="System Profile & Architecture">
+            <div class="card-header-bar">
+              <span class="np-kicker" style="margin-bottom:0;">SYSTEM SPECIFICATION</span>
+              <span class="badge badge-ink">LOCAL-FIRST</span>
+            </div>
+            <h2 class="card-title" style="font-size: 1.35rem; margin-bottom: 12px;">Core Architecture Principles</h2>
+            <ul class="editorial-summary-list">
+              <li>
+                <strong>01. Separate Prediction & Training</strong>
+                Predictions are suggestions. A newly ingested email never automatically becomes a training label. Only explicit human confirmation writes to the feedback ledger.
+              </li>
+              <li>
+                <strong>02. Immutable Candidate Registry</strong>
+                Candidate models are compiled into isolated snapshots. Active predictions never change until a candidate passes evaluation and is explicitly activated.
+              </li>
+              <li>
+                <strong>03. Enforced Evaluation Gates</strong>
+                Activation is physically gated by the application service. The UI prevents promoting candidates that have not been scored on held-out evaluation data.
+              </li>
+              <li>
+                <strong>04. 1-Click Rollback Integrity</strong>
+                Restoring an earlier model version immediately reverts classification weights, prediction baselines, and confidence states in SQLite.
+              </li>
+            </ul>
+          </aside>
+        </div>
+      </div>
+    </section>
+
+    <!-- 2. Interactive Product Preview: The Triage Desk -->
+    <section class="section-block" id="product-preview" aria-labelledby="preview-heading">
+      <div class="container">
+        <div class="section-header-bar">
+          <div class="section-heading-group">
+            <span class="np-kicker"><span class="section-num">02</span>INTERACTIVE TRIAGE DESK</span>
+            <h2 id="preview-heading">Realistic Inbox Triage Interface</h2>
+          </div>
+          <p class="section-lead-text">
+            Experience the actual InboxLearn workflow below. Examine uncalibrated model estimates, uncertain predictions flagged for review, and inspect the human correction controls.
+          </p>
+        </div>
+
+        <!-- Realistic Triage Console -->
+        <div class="triage-console" role="region" aria-label="Triage Interface Mockup">
+          <!-- Top Console Status Bar -->
+          <div class="console-topbar">
+            <div>
+              <span class="live-dot" aria-hidden="true"></span>
+              <strong>ACTIVE WORKSPACE:</strong> Local Mailbox (3 demonstration messages loaded)
+            </div>
+            <div>
+              <strong>MODEL LINEAGE:</strong> <span id="statModelVersion">v1.0.4-active (Seed baseline)</span>
+            </div>
+            <div>
+              <strong>FEEDBACK COMMITS:</strong> <span id="ledgerCounter" style="color:#00FF66; font-weight:bold;">0</span> confirmed
+            </div>
+          </div>
+
+          <!-- Main Console Workspace -->
+          <div class="console-workspace">
+            <!-- Left Pane: Message Queue -->
+            <nav class="console-inbox-pane" aria-label="Message Selection Queue">
+              <div class="pane-header">
+                <span>Incoming Queue</span>
+                <span class="badge badge-muted" style="font-size:0.65rem;">3 Messages</span>
+              </div>
+              <ul class="email-items-list" id="emailList" role="tablist" aria-label="Email triage list">
+                <!-- Dynamically populated by landing/script.js -->
+              </ul>
+            </nav>
+
+            <!-- Right Pane: Triage & Human Review Deck -->
+            <div class="console-detail-pane">
+              <!-- Message Meta -->
+              <div class="detail-email-meta">
+                <h3 class="detail-subject" id="detailSubject">Interview moved to Tuesday</h3>
+                <div class="detail-sender-row">
+                  <div><strong>FROM:</strong> <span id="detailSender">feedback-careers@example.test</span></div>
+                  <div><strong>RECEIVED:</strong> <span id="detailDate">Today, 09:14 AM</span></div>
+                  <div><strong>FORMAT:</strong> <span id="detailFormat">RFC 822 (.eml)</span></div>
+                </div>
+              </div>
+
+              <!-- Message Body Preview -->
+              <div class="detail-body-box" id="detailBody">
+                Hello,
+
+The engineering hiring team has rescheduled your technical interview to Tuesday at 10:00 AM Eastern. Please confirm your availability or propose an alternative window via the applicant portal.
+
+Best regards,
+Talent Acquisition Team
+              </div>
+
+              <!-- Dual Column: Prediction vs Human Review -->
+              <div class="triage-control-grid">
+                <!-- Left: Machine Learning Prediction -->
+                <div class="triage-card">
+                  <div class="triage-card-title">
+                    <span>Machine Prediction</span>
+                    <span class="badge badge-muted">Model Estimate</span>
+                  </div>
+
+                  <div class="stat-field">
+                    <span class="stat-field-label">Predicted Category</span>
+                    <div class="stat-field-value" id="statPredCategory">job opportunities</div>
+                  </div>
+
+                  <div class="stat-field">
+                    <span class="stat-field-label">Suggested Priority</span>
+                    <div class="stat-field-value" id="statPredPriority">high</div>
+                  </div>
+
+                  <div class="stat-field">
+                    <span class="stat-field-label">Confidence Score</span>
+                    <div class="stat-field-value" id="statConfidence">
+                      0.68 <span class="uncalibrated-notice">(Uncalibrated raw sigmoid estimate)</span>
+                    </div>
+                  </div>
+
+                  <div class="stat-field" style="margin-bottom: 0;">
+                    <span class="stat-field-label">Review Queue Status</span>
+                    <div id="statReviewStatus" style="margin-top: 4px;">
+                      <span class="badge badge-accent">Needs Review</span>
+                      <small style="display:block;margin-top:2px;color:var(--np-secondary)">Below threshold (0.68 &lt; 0.70 category confidence)</small>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Right: Human Correction Deck -->
+                <div class="triage-card">
+                  <div class="triage-card-title">
+                    <span>Human Review Deck</span>
+                    <span class="badge badge-ink">Ground Truth</span>
+                  </div>
+
+                  <form class="correction-form" id="correctionForm">
+                    <div class="form-group">
+                      <label for="correctionCategory">Correct / Verify Category</label>
+                      <select id="correctionCategory" class="form-select">
+                        <option value="job opportunities">job opportunities</option>
+                        <option value="university">university</option>
+                        <option value="bills">bills</option>
+                        <option value="promotions">promotions</option>
+                        <option value="spam">spam</option>
+                      </select>
+                    </div>
+
+                    <div class="form-group">
+                      <label for="correctionPriority">Correct / Verify Priority</label>
+                      <select id="correctionPriority" class="form-select">
+                        <option value="high">high</option>
+                        <option value="normal">normal</option>
+                        <option value="low">low</option>
+                      </select>
+                    </div>
+
+                    <div style="padding-top: 6px;">
+                      <button type="button" class="btn btn-primary" id="btnSaveCorrection" style="width: 100%;">
+                        <span>Save & Next (Commit Feedback)</span>
+                        <span aria-hidden="true">↵</span>
+                      </button>
+                    </div>
+                  </form>
+                </div>
+              </div>
+
+              <!-- Console Bottom Operational Ledger Status -->
+              <div class="console-footer-status">
+                <div id="consoleStatusMsg">
+                  Click an email on the left or commit a correction above to see how SQLite persists feedback without altering the live model.
+                </div>
+                <div class="np-mono" style="color:var(--np-secondary);">
+                  Gated Activation Enforced
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 3. The Learning Loop: 7-Stage Pipeline -->
+    <section class="section-block section-block-alt" id="learning-loop" aria-labelledby="loop-heading">
+      <div class="container">
+        <div class="section-header-bar">
+          <div class="section-heading-group">
+            <span class="np-kicker"><span class="section-num">03</span>CONTINUOUS IMPROVEMENT</span>
+            <h2 id="loop-heading">The 7-Stage Learning Loop</h2>
+          </div>
+          <p class="section-lead-text">
+            From ingestion to reversible activation: how InboxLearn improves accuracy safely without catastrophic forgetting or unverified drift.
+          </p>
+        </div>
+
+        <!-- 7-Stage Visual Broadsheet Stepper -->
+        <div class="loop-flow-container" role="list" aria-label="7-stage email triage and learning pipeline">
+          <!-- Step 1 -->
+          <div class="loop-step-card" role="listitem">
+            <span class="step-number">STAGE 01</span>
+            <h3 class="step-title">Import</h3>
+            <p class="step-desc">
+              Ingest raw email data from CSV, RFC 822 (.eml), or Unix .mbox archives. Content is parsed and stored locally in SQLite without remote leaks.
+            </p>
+            <span class="step-badge">Multi-Format Intake</span>
+          </div>
+
+          <!-- Step 2 -->
+          <div class="loop-step-card" role="listitem">
+            <span class="step-number">STAGE 02</span>
+            <h3 class="step-title">Classify</h3>
+            <p class="step-desc">
+              Stateless HashingVectorizer extracts n-grams. Dual incremental SGD classifiers generate raw category and priority scores.
+            </p>
+            <span class="step-badge">Dual SGD Models</span>
+          </div>
+
+          <!-- Step 3 -->
+          <div class="loop-step-card is-human-gate" role="listitem">
+            <span class="step-number">STAGE 03</span>
+            <h3 class="step-title">Review</h3>
+            <p class="step-desc">
+              Predictions falling below confidence thresholds (0.70) are flagged and automatically routed to the human review desk.
+            </p>
+            <span class="step-badge" style="border-color:var(--np-accent); color:var(--np-accent);">Uncertainty Gate</span>
+          </div>
+
+          <!-- Step 4 -->
+          <div class="loop-step-card is-human-gate" role="listitem">
+            <span class="step-number">STAGE 04</span>
+            <h3 class="step-title">Correct</h3>
+            <p class="step-desc">
+              The human operator confirms or alters labels. Corrections are recorded transactionally with full timestamp and revision history.
+            </p>
+            <span class="step-badge" style="border-color:var(--np-accent); color:var(--np-accent);">Human Authority</span>
+          </div>
+
+          <!-- Step 5 -->
+          <div class="loop-step-card" role="listitem">
+            <span class="step-number">STAGE 05</span>
+            <h3 class="step-title">Retrain</h3>
+            <p class="step-desc">
+              The system trains an isolated candidate model from baseline seed plus latest corrections. Live predictions remain strictly unchanged.
+            </p>
+            <span class="step-badge">Candidate Isolation</span>
+          </div>
+
+          <!-- Step 6 -->
+          <div class="loop-step-card" role="listitem">
+            <span class="step-number">STAGE 06</span>
+            <h3 class="step-title">Evaluate</h3>
+            <p class="step-desc">
+              Candidate model is scored on a disjoint held-out test split. Confusion matrices and accuracy deltas are presented for inspection.
+            </p>
+            <span class="step-badge">Held-Out Benchmark</span>
+          </div>
+
+          <!-- Step 7 -->
+          <div class="loop-step-card is-rollback" role="listitem">
+            <span class="step-number">STAGE 07</span>
+            <h3 class="step-title">Roll Back</h3>
+            <p class="step-desc">
+              Promotion is human-approved. If regressions appear later, an instant 1-click rollback restores prior model weights and predictions.
+            </p>
+            <span class="step-badge">Zero-Risk Safety</span>
+          </div>
+        </div>
+
+        <!-- Explanatory Broadsheet Banner -->
+        <div class="loop-callout-banner">
+          <div>
+            <strong>Why this architecture matters:</strong>
+            Standard auto-learning systems silently poison their own training sets when automated predictions are recycled as ground truth. InboxLearn guarantees that only human-confirmed decisions inform new model weights.
+          </div>
+          <div>
+            <a href="#trust-safety" class="btn btn-secondary btn-sm" style="white-space:nowrap;">Read Safety Contract →</a>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 4. Core Capabilities: Editorial Broadsheet Grid -->
+    <section class="section-block" id="capabilities" aria-labelledby="cap-heading">
+      <div class="container">
+        <div class="section-header-bar">
+          <div class="section-heading-group">
+            <span class="np-kicker"><span class="section-num">04</span>SYSTEM CAPABILITIES</span>
+            <h2 id="cap-heading">Engineered for Local Control & Longevity</h2>
+          </div>
+          <p class="section-lead-text">
+            Every capability in InboxLearn is built upon transparent, auditable engineering foundations rather than ephemeral cloud subscriptions.
+          </p>
+        </div>
+
+        <div class="capabilities-grid">
+          <!-- Card 1 -->
+          <article class="cap-card">
+            <span class="cap-kicker">WORKFLOW DISCIPLINE</span>
+            <h3>Human-in-the-Loop Learning</h3>
+            <p class="cap-desc">
+              Raw predictions are never treated as training data. The model learns exclusively from verified human confirmations and corrections.
+            </p>
+            <span class="cap-tag">Verified Feedback</span>
+          </article>
+
+          <!-- Card 2 -->
+          <article class="cap-card">
+            <span class="cap-kicker">LOCAL ARCHITECTURE</span>
+            <h3>SQLite Persistence</h3>
+            <p class="cap-desc">
+              All emails, feedback revisions, model weight snapshots, and held-out evaluation logs live in a single, inspectable local SQLite file.
+            </p>
+            <span class="cap-tag">Zero Cloud Database</span>
+          </article>
+
+          <!-- Card 3 -->
+          <article class="cap-card">
+            <span class="cap-kicker">MACHINE LEARNING</span>
+            <h3>Incremental SGD Models</h3>
+            <p class="cap-desc">
+              Uses stateless `HashingVectorizer` coupled with dual `SGDClassifier(loss="log_loss")` models for rapid, low-memory online learning.
+            </p>
+            <span class="cap-tag">scikit-learn Native</span>
+          </article>
+
+          <!-- Card 4 -->
+          <article class="cap-card">
+            <span class="cap-kicker">VERSION LEDGER</span>
+            <h3>Model Versioning</h3>
+            <p class="cap-desc">
+              Every trained candidate receives an immutable identifier with exact feedback membership. Historical versions remain preserved.
+            </p>
+            <span class="cap-tag">Snapshot Lineage</span>
+          </article>
+
+          <!-- Card 5 -->
+          <article class="cap-card">
+            <span class="cap-kicker">VALIDATION RIGOR</span>
+            <h3>Held-Out Evaluation</h3>
+            <p class="cap-desc">
+              Enforces a strict 0-overlap held-out dataset. The application service prevents activating any candidate without verified benchmark scores.
+            </p>
+            <span class="cap-tag">Service Gated</span>
+          </article>
+
+          <!-- Card 6 -->
+          <article class="cap-card">
+            <span class="cap-kicker">RISK MITIGATION</span>
+            <h3>Reversible Rollback</h3>
+            <p class="cap-desc">
+              If an updated model introduces unintended regressions in the wild, rollback restores the previous model's exact weights and confidence scores.
+            </p>
+            <span class="cap-tag">Atomic Rollback</span>
+          </article>
+
+          <!-- Card 7 -->
+          <article class="cap-card">
+            <span class="cap-kicker">DATA INTAKE</span>
+            <h3>CSV, EML, & MBOX Import</h3>
+            <p class="cap-desc">
+              Robust multi-format parsers handle RFC 822 email files, large Unix mbox archives, and standard UTF-8 CSV exports with duplicate detection.
+            </p>
+            <span class="cap-tag">Multi-Format Intake</span>
+          </article>
+
+          <!-- Card 8 -->
+          <article class="cap-card">
+            <span class="cap-kicker">ENTITY AWARENESS</span>
+            <h3>Calendar Export (.ics)</h3>
+            <p class="cap-desc">
+              Extracts dates, deadlines, and action items. Generates confirmed RFC 5545 `.ics` files. Two-way Google Calendar sync is on the planned roadmap.
+            </p>
+            <span class="cap-tag cap-tag--planned">Local .ICS Live · Sync Planned</span>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <!-- 5. Trust, Safety & Limitations: The Transparency Ledger -->
+    <section class="section-block section-block-alt" id="trust-safety" aria-labelledby="safety-heading">
+      <div class="container">
+        <div class="safety-container">
+          <div class="safety-header">
+            <span class="np-kicker--accent">HONEST SPECIFICATION · NO EXAGGERATION</span>
+            <h2 id="safety-heading" style="margin-top: 4px;">Trust, Safety & Architectural Limitations</h2>
+            <p style="font-size: 1.05rem; color: var(--np-secondary); margin-top: 8px;">
+              InboxLearn prioritizes technical truthfulness over marketing claims. Below is our formal transparency contract.
+            </p>
+          </div>
+
+          <div class="safety-grid">
+            <!-- Item 1 -->
+            <div class="safety-item is-critical">
+              <h4>1. Model Learns Only from Confirmed Feedback</h4>
+              <p>
+                Automatic model predictions are strictly <strong>never treated as ground truth labels</strong>. The machine learning pipeline only digests rows explicitly confirmed or edited by a human reviewer.
+              </p>
+            </div>
+
+            <!-- Item 2 -->
+            <div class="safety-item">
+              <h4>2. Actions Are Suggestions Only</h4>
+              <p>
+                The system suggests follow-up actions and priorities, but <strong>executes zero external destructive operations</strong>. InboxLearn will never delete emails, send replies, or draft messages autonomously.
+              </p>
+            </div>
+
+            <!-- Item 3 -->
+            <div class="safety-item is-critical">
+              <h4>3. Confidence Estimates Are Uncalibrated</h4>
+              <p>
+                The displayed confidence percentages represent raw logistic loss scores, <strong>not true calibrated probabilities</strong>. A 0.85 estimate indicates internal model margin, not an 85% statistical likelihood of correctness.
+              </p>
+            </div>
+
+            <!-- Item 4 -->
+            <div class="safety-item">
+              <h4>4. Demonstration Data Uses Synthetic Messages</h4>
+              <p>
+                All benchmark numbers published in portfolio reports reflect the bundled <strong>synthetic demo fixtures</strong> (15 seed emails, 5 feedback messages, 10 held-out examples). They do not represent real-world corporate accuracy.
+              </p>
+            </div>
+
+            <!-- Item 5 -->
+            <div class="safety-item">
+              <h4>5. Gmail & Clerk Auth Are Roadmap Features</h4>
+              <p>
+                Direct live Google Gmail OAuth write connectivity and Clerk user authentication are <strong>future roadmap capabilities</strong>, currently disabled or planned for multi-user releases. The current system operates strictly locally.
+              </p>
+            </div>
+
+            <!-- Item 6 -->
+            <div class="safety-item">
+              <h4>6. No Privacy Claims for Hosted Environments</h4>
+              <p>
+                When executed locally on your machine, data never leaves your computer. However, if deployed to public hosted services (e.g. Streamlit Cloud), privacy depends on the host's infrastructure; no zero-knowledge encryption is claimed.
+              </p>
+            </div>
+          </div>
+
+          <div class="safety-disclaimer-box">
+            <strong>PORTFOLIO AUDIT STATEMENT:</strong> This software is a focused portfolio implementation demonstrating machine learning software engineering, human-in-the-loop lifecycle design, and resilient architecture. We do not publish inflated benchmarks, fake user counts, or claims of total autonomy.
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 6. How It Differs: Architectural Comparison -->
+    <section class="section-block" id="comparison" aria-labelledby="diff-heading">
+      <div class="container">
+        <div class="section-header-bar">
+          <div class="section-heading-group">
+            <span class="np-kicker"><span class="section-num">06</span>TECHNICAL DIFFERENTIATION</span>
+            <h2 id="diff-heading">How InboxLearn Differs</h2>
+          </div>
+          <p class="section-lead-text">
+            Compare InboxLearn against conventional email management solutions, static rules, and generative AI wrappers.
+          </p>
+        </div>
+
+        <div class="comparison-table-wrapper" role="region" aria-label="Comparison Table">
+          <table class="comparison-table">
+            <thead>
+              <tr>
+                <th style="width: 22%;">Dimension</th>
+                <th class="col-highlight" style="width: 28%;">InboxLearn (Human-in-the-Loop)</th>
+                <th style="width: 25%;">Static Rules & Filters</th>
+                <th style="width: 25%;">Cloud LLM Wrappers</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td class="dim-label">Human Review Integration</td>
+                <td class="col-highlight"><strong>Native review queue:</strong> Uncertain predictions flagged automatically for human confirmation.</td>
+                <td>Manual rule updates required; no uncertainty detection.</td>
+                <td>Black-box outputs without structured confidence thresholds.</td>
+              </tr>
+              <tr>
+                <td class="dim-label">Continuous Learning</td>
+                <td class="col-highlight"><strong>Incremental retrain:</strong> Learns from human corrections with candidate snapshot isolation.</td>
+                <td>Static regex/sender matching; cannot adapt to semantic shifts.</td>
+                <td>Prompt engineering only; base weights cannot be updated locally.</td>
+              </tr>
+              <tr>
+                <td class="dim-label">Evaluation & Safety Gate</td>
+                <td class="col-highlight"><strong>Held-out verification:</strong> Service blocks candidate activation until tested on fresh data.</td>
+                <td>None; rule syntax errors or broad matches silently misfile emails.</td>
+                <td>Hallucinations cannot be programmatically benchmarked offline.</td>
+              </tr>
+              <tr>
+                <td class="dim-label">Rollback Capability</td>
+                <td class="col-highlight"><strong>Instant 1-click rollback:</strong> Reverts weights, predictions, and SQLite state atomically.</td>
+                <td>Manual filter undo; no state history.</td>
+                <td>None; prompt edits often cause unpredictable secondary regressions.</td>
+              </tr>
+              <tr>
+                <td class="dim-label">Privacy & Operational Cost</td>
+                <td class="col-highlight"><strong>Local-first:</strong> Runs on CPU via Python/SQLite. Zero token costs, zero API keys.</td>
+                <td>Local email client execution.</td>
+                <td>Transmits full email bodies to cloud LLM APIs; recurring subscription fees.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- 7. Final Call to Action -->
+    <section class="final-cta-section" id="how-it-works" aria-labelledby="cta-heading">
+      <div class="container">
+        <span class="np-kicker" style="color: #AAAAAA;">GETTING STARTED</span>
+        <h2 id="cta-heading">Try the triage workflow locally.</h2>
+        <p>
+          Experience how structured human feedback creates a self-improving email classifier without cloud dependencies or paid APIs.
+        </p>
+
+        <div class="cta-button-group">
+          <a href="http://localhost:8501" target="_blank" rel="noopener noreferrer" class="btn btn-accent btn-lg">
+            <span>Open InboxLearn (Local App)</span>
+            <span aria-hidden="true">→</span>
+          </a>
+          <a href="https://github.com/sohaib-0897/InboxLearn" target="_blank" rel="noopener noreferrer" class="btn btn-secondary btn-lg" style="background:#222222; color:#FFFFFF; border-color:#555555;">
+            <span>View GitHub Repository</span>
+          </a>
+          <a href="../docs/PROJECT_GUIDE.md" class="btn btn-secondary btn-lg" style="background:#222222; color:#FFFFFF; border-color:#555555;">
+            <span>Read Project Guide</span>
+          </a>
+        </div>
+
+        <div style="margin-top: 16px;">
+          <div class="code-snippet-box">
+            <span>$ streamlit run app.py</span>
+            <button type="button" id="copyCmdBtn" aria-label="Copy terminal run command">COPY COMMAND</button>
+          </div>
+          <div style="font-family: var(--np-mono); font-size: 0.72rem; color: #888888; margin-top: 8px;">
+            Binds to 127.0.0.1:8501 by default with usage telemetry disabled.
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- 8. Colophon & Broadsheet Footer -->
+  <footer class="site-footer" role="contentinfo">
+    <div class="container">
+      <div class="footer-grid">
+        <div class="footer-brand">
+          <h3>INBOXLEARN</h3>
+          <p>
+            An open-source human-in-the-loop email triage system demonstrating incremental classification, immutable model versioning, held-out evaluation, and reversible activation.
+          </p>
+          <p style="margin-top: 12px; font-family: var(--np-mono); font-size: 0.75rem;">
+            Designed in the <em>Newsprint Intelligence</em> aesthetic.
+          </p>
+        </div>
+
+        <div class="footer-col">
+          <h4>Workflow</h4>
+          <ul>
+            <li><a href="#how-it-works">How It Works</a></li>
+            <li><a href="#product-preview">Interactive Triage</a></li>
+            <li><a href="#learning-loop">7-Stage Loop</a></li>
+            <li><a href="#capabilities">Core Capabilities</a></li>
+            <li><a href="#comparison">Architectural Matrix</a></li>
+          </ul>
+        </div>
+
+        <div class="footer-col">
+          <h4>Documentation</h4>
+          <ul>
+            <li><a href="../docs/PROJECT_GUIDE.md">Project Guide</a></li>
+            <li><a href="../PORTFOLIO.md">Portfolio Evidence</a></li>
+            <li><a href="../reports/learning.md">Measured Benchmark</a></li>
+            <li><a href="../docs/screenshots/README.md">UI Captures</a></li>
+            <li><a href="https://github.com/sohaib-0897/InboxLearn" target="_blank" rel="noopener noreferrer">GitHub Repository</a></li>
+          </ul>
+        </div>
+
+        <div class="footer-col">
+          <h4>Roadmap (Planned)</h4>
+          <ul>
+            <li><span style="font-size:0.85rem; color:var(--np-secondary);">Gmail OAuth Read/Write (Planned)</span></li>
+            <li><span style="font-size:0.85rem; color:var(--np-secondary);">Clerk Authentication (Planned)</span></li>
+            <li><span style="font-size:0.85rem; color:var(--np-secondary);">Two-Way CalDAV Sync (Planned)</span></li>
+            <li><span style="font-size:0.85rem; color:var(--np-secondary);">Platt Calibrated Probs (Planned)</span></li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="footer-bottom-bar">
+        <div>
+          © 2026 Muhammad Sohaib Imran · InboxLearn Project
+        </div>
+        <div>
+          BUILT WITH PYTHON · SCIKIT-LEARN · STREAMLIT · SQLITE
+        </div>
+      </div>
+    </div>
+  </footer>
+
+  <!-- Interactive JavaScript -->
+  <script src="script.js"></script>
+</body>
+</html>
