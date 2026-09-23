@@ -21,11 +21,47 @@ from inboxlearn.presentation import (
 
 st.set_page_config(page_title="InboxLearn", page_icon="✉", layout="wide", initial_sidebar_state="collapsed")
 
+APP_VERSION = "2.1.1"
+
+# Ensure InboxLearnService class definition has gmail methods even if an older instance was in memory
+if not hasattr(InboxLearnService, "gmail_status"):
+    from inboxlearn.gmail import (
+        CredentialStore as _CS, GmailClient as _GC, is_gmail_enabled as _ige,
+        sync_gmail as _sgm, disconnect_gmail as _dgm
+    )
+    def _fallback_gmail_status(self, storage_dir="runtime/credentials"):
+        if not _ige():
+            return {"enabled": False, "connected": False, "reason": "Disabled in hosted/demo mode."}
+        store = _CS(storage_dir=storage_dir)
+        tokens = store.load_tokens()
+        if not tokens:
+            return {"enabled": True, "connected": False}
+        return {
+            "enabled": True,
+            "connected": True,
+            "account_email": tokens.get("account_email", "unknown"),
+            "saved_at": tokens.get("saved_at", ""),
+            "protected_by": tokens.get("protected_by", "file"),
+        }
+
+    def _fallback_sync_gmail(self, client_id, client_secret, *, days=30, max_messages=100, storage_dir="runtime/credentials", cancel_check=None, progress_callback=None):
+        store = _CS(storage_dir=storage_dir)
+        client = _GC(store, client_id=client_id, client_secret=client_secret)
+        return _sgm(self, client, days=days, max_messages=max_messages, cancel_check=cancel_check, progress_callback=progress_callback)
+
+    def _fallback_disconnect_gmail(self, client_id, client_secret, storage_dir="runtime/credentials"):
+        store = _CS(storage_dir=storage_dir)
+        return _dgm(store, client_id=client_id, client_secret=client_secret)
+
+    InboxLearnService.gmail_status = _fallback_gmail_status
+    InboxLearnService.sync_gmail = _fallback_sync_gmail
+    InboxLearnService.disconnect_gmail = _fallback_disconnect_gmail
+
 
 @st.cache_resource
 def get_service(db_path: str, category_threshold: float, priority_threshold: float,
                 max_upload_bytes: int = 5 * 1024 * 1024, max_rows: int = 1000,
-                random_state: int = 42) -> InboxLearnService:
+                random_state: int = 42, version: str = APP_VERSION) -> InboxLearnService:
     return InboxLearnService(Settings(
         db_path=Path(db_path), category_threshold=category_threshold,
         priority_threshold=priority_threshold, max_upload_bytes=max_upload_bytes,
@@ -156,7 +192,11 @@ def render_upload(service: InboxLearnService) -> None:
             st.caption("Five synthetic messages. Classification does not save feedback. Review each label yourself.")
 
     # Gmail connection & sync section
-    gmail_info = service.gmail_status()
+    if hasattr(service, "gmail_status"):
+        gmail_info = service.gmail_status()
+    else:
+        from inboxlearn.gmail import is_gmail_enabled
+        gmail_info = {"enabled": is_gmail_enabled(), "connected": False}
     with st.expander("Gmail connection (Read-only)", expanded=False):
         if not gmail_info["enabled"]:
             st.info("Gmail integration is disabled in hosted demo mode. It is available when running InboxLearn locally on your machine.")
@@ -579,7 +619,8 @@ def main() -> None:
         st.caption("Review when category OR priority falls below its threshold. Confidence is an uncalibrated estimate.")
     try:
         service = get_service(str(settings.db_path.resolve()), category_threshold, priority_threshold,
-                              settings.max_upload_bytes, settings.max_rows, settings.random_state)
+                              settings.max_upload_bytes, settings.max_rows, settings.random_state,
+                              version=APP_VERSION)
         rows = service.repo.inbox_rows()
         active = service.active_version()
         pending = service.repo.pending_feedback_count()
