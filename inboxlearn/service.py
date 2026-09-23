@@ -1,9 +1,11 @@
 import csv
+from datetime import datetime
 import hashlib
 import importlib.metadata
 import io
 import json
 import sys
+from typing import Callable
 
 from .classifier import deserialize_bundle, serialize_bundle, train_bundle
 from .config import CATEGORIES, PRIORITIES, Settings
@@ -161,7 +163,15 @@ class InboxLearnService:
     def _extract_and_save_entities(self, email_id: int, row: dict) -> None:
         """Extract entities from an email and persist them."""
         text = f"{row.get('subject', '')} {row.get('body', '')}"
-        entities = extract_entities(text)
+        ref_date = None
+        date_str = row.get("date") or row.get("date_header") or ""
+        if date_str:
+            try:
+                # Support ISO 8601 strings (e.g. 2025-10-14 or 2025-10-14T15:30:00+00:00)
+                ref_date = datetime.fromisoformat(date_str).date()
+            except (ValueError, TypeError):
+                pass
+        entities = extract_entities(text, reference_date=ref_date)
         for entity in entities:
             self.repo.save_entity(
                 email_id,
@@ -178,6 +188,61 @@ class InboxLearnService:
     def import_batches(self) -> list[dict]:
         """Get import batch listing."""
         return self.repo.import_batches()
+
+    def gmail_status(self, storage_dir: str = "runtime/credentials") -> dict:
+        """Check status of local Gmail connection."""
+        from .gmail import CredentialStore, is_gmail_enabled
+        enabled = is_gmail_enabled()
+        if not enabled:
+            return {"enabled": False, "connected": False, "reason": "Disabled in hosted/demo mode."}
+
+        store = CredentialStore(storage_dir=storage_dir)
+        tokens = store.load_tokens()
+        if not tokens:
+            return {"enabled": True, "connected": False}
+
+        return {
+            "enabled": True,
+            "connected": True,
+            "account_email": tokens.get("account_email", "unknown"),
+            "saved_at": tokens.get("saved_at", ""),
+            "protected_by": tokens.get("protected_by", "file"),
+        }
+
+    def sync_gmail(
+        self,
+        client_id: str,
+        client_secret: str,
+        *,
+        days: int = 30,
+        max_messages: int = 100,
+        storage_dir: str = "runtime/credentials",
+        cancel_check: Callable[[], bool] | None = None,
+        progress_callback: Callable[[int, int, str], None] | None = None,
+    ) -> dict:
+        """Synchronize recent messages from connected Gmail account."""
+        from .gmail import CredentialStore, GmailClient, sync_gmail
+        store = CredentialStore(storage_dir=storage_dir)
+        client = GmailClient(store, client_id=client_id, client_secret=client_secret)
+        return sync_gmail(
+            self,
+            client,
+            days=days,
+            max_messages=max_messages,
+            cancel_check=cancel_check,
+            progress_callback=progress_callback,
+        )
+
+    def disconnect_gmail(
+        self,
+        client_id: str,
+        client_secret: str,
+        storage_dir: str = "runtime/credentials",
+    ) -> dict:
+        """Disconnect Gmail and revoke stored access token."""
+        from .gmail import CredentialStore, disconnect_gmail
+        store = CredentialStore(storage_dir=storage_dir)
+        return disconnect_gmail(store, client_id=client_id, client_secret=client_secret)
 
 
     def save_feedback(self, email_id: int, category: str, priority: str) -> tuple[int, bool]:

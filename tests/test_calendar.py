@@ -115,3 +115,45 @@ def test_roundtrip_manual_parse():
     assert "\r\nSUMMARY:Manual\r\n" in ics
     assert "\r\nEND:VEVENT\r\n" in ics
     assert "\r\nEND:VCALENDAR\r\n" in ics
+
+def test_timezone_conversion():
+    from zoneinfo import ZoneInfo
+    ny_tz = ZoneInfo("America/New_York")
+    dt = datetime(2025, 10, 14, 15, 0, tzinfo=ny_tz) # 3 PM NY is 7 PM UTC (EDT is UTC-4)
+    event = create_event(summary="NY Meeting", dtstart=dt, timezone_name="America/New_York")
+    ics = event_to_ics(event)
+    assert "DTSTART:20251014T190000Z" in ics
+
+def test_strict_line_length_under_75_octets():
+    # Long unicode summary + long description
+    summary = "Important Conference on Machine Learning and Natural Language Processing in Tokyo, Japan" * 2
+    desc = "Line with special characters: こんにちは 世界! Also with symbols: ;, \\, and newlines \n Next line." * 5
+    event = create_event(summary=summary, dtstart=date(2025, 12, 1), description=desc, location="Tokyo")
+    ics_bytes = event_to_ics_bytes(event)
+    
+    # Split by CRLF
+    lines = ics_bytes.split(b"\r\n")
+    for i, line in enumerate(lines):
+        # Empty line at the end after trailing CRLF is acceptable
+        if i == len(lines) - 1 and line == b"":
+            continue
+        assert len(line) <= 75, f"Line {i} exceeds 75 octets: len={len(line)}, content={line!r}"
+
+def test_escaping_rules_rfc5545():
+    event = create_event(
+        summary="A, B; C \\ D",
+        description="Line 1\nLine 2\r\nLine 3, with ; and \\",
+        dtstart=date(2025, 5, 20)
+    )
+    ics = event_to_ics(event)
+    assert "SUMMARY:A\\, B\\; C \\\\ D" in ics
+    assert "Line 1\\nLine 2\\nLine 3\\, with \\; and \\\\" in ics
+
+def test_all_day_date_preserves_date_not_midnight_utc():
+    d = date(2025, 11, 25)
+    event = create_event(summary="All Day Event", dtstart=d)
+    ics = event_to_ics(event)
+    assert "DTSTART;VALUE=DATE:20251125\r\n" in ics
+    assert "DTEND;VALUE=DATE:20251126\r\n" in ics # exclusive next day
+    assert "000000Z" not in ics
+

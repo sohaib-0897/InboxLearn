@@ -1,6 +1,6 @@
 """Native Streamlit presentation over the existing InboxLearn service."""
 import json
-from datetime import date, datetime
+from datetime import date, datetime, time as dt_time
 from math import ceil
 from pathlib import Path
 
@@ -8,7 +8,9 @@ import pandas as pd
 import streamlit as st
 
 from inboxlearn.config import CATEGORIES, PRIORITIES, Settings
-from inboxlearn.calendar_export import create_event, event_to_ics_bytes, download_filename
+from inboxlearn.calendar_export import (
+    create_event, event_to_ics_bytes, download_filename, SUPPORTED_TIMEZONES
+)
 from inboxlearn.demo import demo_data_path, load_demo_rows
 from inboxlearn.entities import ExtractedEntity
 from inboxlearn.service import InboxLearnService
@@ -50,6 +52,89 @@ def message_label(row: dict) -> str:
     return f"#{row['id']} · {subject[:72]}{'…' if len(subject) > 72 else ''}"
 
 
+def render_calendar_editor(row: dict, entities: list[dict], key_prefix: str) -> None:
+    """Render extracted entities and an interactive form to confirm/edit dates and timezone before .ics export."""
+    if not entities:
+        return
+    with st.expander(f"Extracted entities ({len(entities)})", expanded=False):
+        for entity in entities:
+            icon = {"deadline": "📅", "date_mention": "📆", "amount": "💰",
+                    "action_item": "✅", "contact_email": "📧", "url": "🔗"}.get(entity["entity_type"], "📌")
+            val_display = entity["entity_value"] or "(ambiguous/unresolved)"
+            st.write(f"{icon} **{entity['entity_type']}**: {val_display}")
+            if entity.get("source_phrase"):
+                st.caption(f"From: \"{entity['source_phrase']}\"")
+
+        # Calendar event confirmation/editing section
+        date_entities = [e for e in entities if e["entity_type"] in ("deadline", "date_mention")]
+        if date_entities:
+            st.markdown("---")
+            st.markdown("**Confirm & export calendar event (.ics)**")
+            selected_phrase_idx = st.selectbox(
+                "Source mention to schedule",
+                range(len(date_entities)),
+                format_func=lambda i: f"#{i+1}: {date_entities[i].get('source_phrase', '')[:50] or date_entities[i].get('entity_value', 'date')}",
+                key=f"{key_prefix}_cal_select",
+            )
+            target_entity = date_entities[selected_phrase_idx]
+            val = target_entity.get("entity_value", "")
+            is_ambiguous = not val
+
+            default_d = date.today()
+            if val:
+                try:
+                    default_d = date.fromisoformat(val)
+                except (ValueError, TypeError):
+                    pass
+
+            if is_ambiguous:
+                st.info(f"The date phrase \"{target_entity.get('source_phrase', '')}\" is ambiguous. Please confirm the exact date below.")
+
+            c1, c2 = st.columns(2)
+            with c1:
+                ev_title = st.text_input("Event title", value=f"{row['category'].title()}: {row['subject'][:55]}", key=f"{key_prefix}_ev_title")
+                ev_date = st.date_input("Event date", value=default_d, key=f"{key_prefix}_ev_date")
+                all_day = st.checkbox("All-day event", value=True, key=f"{key_prefix}_ev_allday")
+            with c2:
+                ev_time = st.time_input("Start time", value=dt_time(9, 0), disabled=all_day, key=f"{key_prefix}_ev_time")
+                ev_tz = st.selectbox("Timezone", SUPPORTED_TIMEZONES, index=0, key=f"{key_prefix}_ev_tz")
+                ev_loc = st.text_input("Location (optional)", value="", key=f"{key_prefix}_ev_loc")
+
+            ev_desc = st.text_area(
+                "Event description",
+                value=f"InboxLearn email #{row['id']}: {row['subject']}\nFrom: {row.get('sender', '')}\n\nExtracted phrase: {target_entity.get('source_phrase', '')}",
+                key=f"{key_prefix}_ev_desc",
+            )
+
+            try:
+                if all_day:
+                    dtstart = ev_date
+                else:
+                    from zoneinfo import ZoneInfo
+                    dtstart = datetime.combine(ev_date, ev_time, tzinfo=ZoneInfo(ev_tz))
+
+                event = create_event(
+                    summary=ev_title or row["subject"],
+                    dtstart=dtstart,
+                    description=ev_desc,
+                    location=ev_loc,
+                    email_id=int(row["id"]),
+                    source_phrase=target_entity.get("source_phrase", ""),
+                    timezone_name=ev_tz,
+                )
+                ics_data = event_to_ics_bytes(event)
+                st.download_button(
+                    label=f"📅 Download confirmed .ics file",
+                    data=ics_data,
+                    file_name=download_filename(event),
+                    mime="text/calendar",
+                    key=f"{key_prefix}_btn_ics_dl",
+                )
+            except Exception as exc:
+                st.error(f"Cannot generate .ics: {exc}")
+
+
+
 def render_upload(service: InboxLearnService) -> None:
     section("01", "Inbox & intake", "Upload a batch. Inspect its predictions. Decide what needs a second look.")
     with st.expander("Import emails", expanded=not service.repo.inbox_rows()):
@@ -57,7 +142,7 @@ def render_upload(service: InboxLearnService) -> None:
         with upload:
             uploaded = st.file_uploader("Email file", type=["csv", "eml", "mbox"], key="email_upload",
                                         max_upload_size=max(1, ceil(service.settings.max_upload_bytes / 1024**2)))
-            if st.button("Classify file", type="primary", disabled=uploaded is None, key="classify_csv"):
+            if st.button("Classify CSV", type="primary", disabled=uploaded is None, key="classify_csv"):
                 classify(service, uploaded.getvalue())
         with guidance:
             st.markdown("**SUPPORTED FORMATS**")
@@ -70,9 +155,67 @@ def render_upload(service: InboxLearnService) -> None:
                 classify(service, demo_data_path("demo_feedback.csv").read_bytes(), "demonstration")
             st.caption("Five synthetic messages. Classification does not save feedback. Review each label yourself.")
 
+    # Gmail connection & sync section
+    gmail_info = service.gmail_status()
+    with st.expander("Gmail connection (Read-only)", expanded=False):
+        if not gmail_info["enabled"]:
+            st.info("Gmail integration is disabled in hosted demo mode. It is available when running InboxLearn locally on your machine.")
+        elif not gmail_info["connected"]:
+            st.markdown("**CONNECT GMAIL (READ-ONLY)**")
+            st.caption("Local desktop OAuth 2.0 PKCE flow. Opens your system browser to grant read-only access. No emails will be sent, modified, or deleted.")
+            c_id_col, c_sec_col = st.columns(2)
+            with c_id_col:
+                g_client_id = st.text_input("OAuth Client ID", value=st.session_state.get("gmail_client_id", ""), key="input_gmail_client_id")
+            with c_sec_col:
+                g_client_secret = st.text_input("OAuth Client Secret", value=st.session_state.get("gmail_client_secret", ""), type="password", key="input_gmail_client_secret")
+            if st.button("Connect Gmail account", disabled=not g_client_id or not g_client_secret, key="btn_connect_gmail"):
+                try:
+                    from inboxlearn.gmail import run_oauth_flow, CredentialStore, GmailClient
+                    with st.spinner("Opening system browser for Google consent…"):
+                        tokens = run_oauth_flow(g_client_id.strip(), g_client_secret.strip())
+                    store = CredentialStore()
+                    temp_client = GmailClient(store, g_client_id.strip(), g_client_secret.strip())
+                    store._memory_token = {"tokens": tokens}
+                    prof = temp_client.get_profile()
+                    store.save_tokens(prof.get("emailAddress", "unknown"), tokens)
+                    st.session_state["gmail_client_id"] = g_client_id.strip()
+                    st.session_state["gmail_client_secret"] = g_client_secret.strip()
+                    flash(f"Connected to Gmail account: {prof.get('emailAddress')}. Credentials protected locally.")
+                except Exception as exc:
+                    st.error(f"Gmail connection failed: {exc}")
+        else:
+            st.success(f"Connected account: **{gmail_info.get('account_email')}** (Read-only access)")
+            st.caption(f"Credentials protected by {gmail_info.get('protected_by')}. Read-only scope: no remote state is modified.")
+            w_col, c_col = st.columns(2)
+            with w_col:
+                sync_days = st.slider("Sync lookback window (days)", min_value=1, max_value=90, value=30, key="g_sync_days")
+            with c_col:
+                sync_cap = st.slider("Max messages cap", min_value=10, max_value=250, value=100, step=10, key="g_sync_cap")
+
+            btn_col1, btn_col2 = st.columns([2, 1])
+            with btn_col1:
+                if st.button("Sync recent Gmail messages", type="primary", key="btn_run_gmail_sync"):
+                    try:
+                        cid = st.session_state.get("gmail_client_id", "")
+                        csec = st.session_state.get("gmail_client_secret", "")
+                        with st.spinner(f"Fetching recent messages from {gmail_info.get('account_email')}…"):
+                            res = service.sync_gmail(cid, csec, days=sync_days, max_messages=sync_cap)
+                        flash(f"Gmail sync complete: {res['new']} imported, {res['duplicates']} duplicates skipped, {res['warnings']} warnings.")
+                    except Exception as exc:
+                        st.error(f"Gmail sync failed: {exc}")
+            with btn_col2:
+                if st.button("Disconnect", key="btn_disconnect_gmail_account"):
+                    try:
+                        cid = st.session_state.get("gmail_client_id", "")
+                        csec = st.session_state.get("gmail_client_secret", "")
+                        dc_res = service.disconnect_gmail(cid, csec)
+                        flash(f"Disconnected {dc_res.get('account')}. Tokens revoked on Google and cleared locally.")
+                    except Exception as exc:
+                        st.error(f"Disconnect failed: {exc}")
+
     rows = service.review_rows(include_confident=True)
     if not rows:
-        st.info("Your inbox is empty. Upload a CSV, .eml, or .mbox file, or classify the demonstration sample above.")
+        st.info("Your inbox is empty. Upload a CSV, .eml, or .mbox file, connect Gmail, or classify the demonstration sample above.")
         return
     batches = service.import_batches()
     batch_options = ["All batches"] + [b["import_batch"] for b in batches] if batches else []
@@ -116,40 +259,9 @@ def render_upload(service: InboxLearnService) -> None:
             row = next(r for r in filtered if r["id"] == selected_id)
             show_email(row)
             original_prediction(row)
-            # Extracted entities display
+            # Extracted entities and interactive calendar editor
             entities = service.entities_for_email(int(row["id"]))
-            if entities:
-                with st.expander(f"Extracted entities ({len(entities)})", expanded=False):
-                    for entity in entities:
-                        icon = {"deadline": "📅", "date_mention": "📆", "amount": "💰",
-                                "action_item": "✅", "contact_email": "📧", "url": "🔗"}.get(entity["entity_type"], "📌")
-                        st.write(f"{icon} **{entity['entity_type']}**: {entity['entity_value'] or '(unresolved)'}")
-                        if entity["source_phrase"]:
-                            st.caption(f"From: \"{entity['source_phrase']}\"")
-                    # Calendar export for deadline entities
-                    deadline_entities = [e for e in entities if e["entity_type"] in ("deadline", "date_mention") and e["entity_value"]]
-                    if deadline_entities:
-                        st.markdown("---")
-                        st.markdown("**Calendar export**")
-                        for i, entity in enumerate(deadline_entities):
-                            try:
-                                parsed_date = date.fromisoformat(entity["entity_value"])
-                                event = create_event(
-                                    summary=f"{row['category'].title()}: {row['subject'][:60]}",
-                                    dtstart=parsed_date,
-                                    description=f"InboxLearn email #{row['id']}: {row['subject']}\n\nSource: {entity['source_phrase']}",
-                                    email_id=int(row["id"]),
-                                    source_phrase=entity["source_phrase"],
-                                )
-                                st.download_button(
-                                    f"📅 Download .ics ({entity['entity_value']})",
-                                    event_to_ics_bytes(event),
-                                    download_filename(event),
-                                    "text/calendar",
-                                    key=f"ics_{row['id']}_{i}",
-                                )
-                            except (ValueError, TypeError):
-                                pass
+            render_calendar_editor(row, entities, f"inbox_{row['id']}")
             st.caption("Open Review queue to confirm or revise these labels.")
 
 
@@ -157,14 +269,67 @@ def render_review(service: InboxLearnService) -> None:
     section("02", "The review desk", "Save the labels you confirm. Training is a separate step.")
     include_confident = st.checkbox("Include confident predictions", value=False, key="include_confident")
     st.caption("Unchecked: unresolved uncertain predictions only. Checked: all messages, including saved corrections that you can revise.")
-    order = st.selectbox("Review order", ["Lowest confidence first", "Newest first"], key="review_order")
-    rows = service.review_rows(include_confident=include_confident, order=order)
+
+    batches = service.import_batches()
+    batch_options = ["All batches"] + [b["import_batch"] for b in batches] if batches else []
+
+    with st.container(key="review_filters_container"):
+        col_ord, col_c, col_p, col_b = st.columns(4)
+        with col_ord:
+            order = st.selectbox("Review order", ["Lowest confidence first", "Newest first"], key="review_order")
+        with col_c:
+            review_cat = st.selectbox("Category filter", ["All categories", *CATEGORIES], key="review_cat_filter")
+        with col_p:
+            review_pri = st.selectbox("Priority filter", ["All priorities", *PRIORITIES], key="review_pri_filter")
+        with col_b:
+            review_batch = st.selectbox("Batch filter", batch_options if batch_options else ["All batches"], key="review_batch_filter")
+
+    all_rows = service.review_rows(include_confident=include_confident, order=order)
     st.caption("Lowest confidence uses the smaller category or priority estimate; ties use message ID.")
     if st.session_state.pop("review_complete", False):
         st.success("Review complete: no unresolved messages remain in this queue.")
+
+    # Apply filters
+    rows = [r for r in all_rows if (review_cat == "All categories" or r["category"] == review_cat)
+            and (review_pri == "All priorities" or r["priority"] == review_pri)
+            and (review_batch == "All batches" or r.get("import_batch", "") == review_batch)]
+
     if not rows:
-        st.info("The review queue is empty. Include confident predictions to review other messages.")
+        st.info("The review queue is empty for these filters. Clear filters or check 'Include confident predictions' to review other messages.")
         return
+
+    # Batch label confirmation tool
+    with st.expander("Batch label confirmation", expanded=False):
+        st.markdown("**BATCH CONFIRMATION**")
+        st.caption("Apply confirmed category and priority to multiple selected emails at once.")
+        selectable = {r["id"]: message_label(r) for r in rows}
+        selected_batch_ids = st.multiselect("Select messages to batch-confirm", list(selectable), format_func=selectable.get, key="batch_confirm_selection")
+
+        if selected_batch_ids:
+            b_cat_col, b_pri_col = st.columns(2)
+            with b_cat_col:
+                batch_target_cat = st.selectbox("Batch confirmed category", CATEGORIES, key="batch_target_cat")
+            with b_pri_col:
+                batch_target_pri = st.selectbox("Batch confirmed priority", PRIORITIES, key="batch_target_pri")
+
+            selected_items = [r for r in rows if r["id"] in selected_batch_ids]
+            preview_records = [{
+                "ID": r["id"],
+                "Subject": r["subject"][:65],
+                "Current Prediction": f"{r['category']} / {r['priority']}",
+                "Confirmed Category": batch_target_cat,
+                "Confirmed Priority": batch_target_pri,
+            } for r in selected_items]
+            st.markdown(f"**Previewing {len(selected_items)} message(s) to confirm:**")
+            st.dataframe(pd.DataFrame(preview_records), hide_index=True, width="stretch")
+
+            if st.button(f"Confirm {len(selected_items)} selected message(s)", type="primary", key="btn_execute_batch_confirm"):
+                count_saved = 0
+                for mid in selected_batch_ids:
+                    service.save_feedback(int(mid), batch_target_cat, batch_target_pri)
+                    count_saved += 1
+                flash(f"Batch confirmed {count_saved} message(s) as {batch_target_cat} / {batch_target_pri}. Prepare a candidate in Train / Versions.")
+
     labels = {r["id"]: message_label(r) for r in rows}
     next_id = st.session_state.pop("next_review_email", None)
     if next_id in labels:
@@ -187,36 +352,9 @@ def render_review(service: InboxLearnService) -> None:
         st.caption("Confidence is an uncalibrated model estimate.")
         st.write("Suggested next action: " + row["suggested_action"])
         st.caption("Suggestion based on the original category. No action is executed.")
-        # Entities in review pane
+        # Extracted entities and interactive calendar editor
         entities = service.entities_for_email(int(row["id"]))
-        if entities:
-            with st.expander(f"Extracted entities ({len(entities)})"):
-                for entity in entities:
-                    icon = {"deadline": "📅", "date_mention": "📆", "amount": "💰",
-                            "action_item": "✅", "contact_email": "📧", "url": "🔗"}.get(entity["entity_type"], "📌")
-                    st.write(f"{icon} **{entity['entity_type']}**: {entity['entity_value'] or '(unresolved)'}")
-                    if entity["source_phrase"]:
-                        st.caption(f"From: \"{entity['source_phrase']}\"")
-                deadline_entities = [e for e in entities if e["entity_type"] in ("deadline", "date_mention") and e["entity_value"]]
-                for i, entity in enumerate(deadline_entities):
-                    try:
-                        parsed_date = date.fromisoformat(entity["entity_value"])
-                        event = create_event(
-                            summary=f"{row['category'].title()}: {row['subject'][:60]}",
-                            dtstart=parsed_date,
-                            description=f"InboxLearn email #{row['id']}: {row['subject']}\n\nSource: {entity['source_phrase']}",
-                            email_id=int(row["id"]),
-                            source_phrase=entity["source_phrase"],
-                        )
-                        st.download_button(
-                            f"📅 Download .ics ({entity['entity_value']})",
-                            event_to_ics_bytes(event),
-                            download_filename(event),
-                            "text/calendar",
-                            key=f"review_ics_{row['id']}_{i}",
-                        )
-                    except (ValueError, TypeError):
-                        pass
+        render_calendar_editor(row, entities, f"review_{row['id']}")
     with editing, st.container(key="correction_panel"):
         st.subheader("Human confirmation")
         history = row["feedback_history"]

@@ -2,8 +2,25 @@ import uuid
 import re
 import warnings
 from dataclasses import dataclass
-from datetime import date, datetime, timezone, timedelta
+from datetime import date, datetime, time, timezone, timedelta
 from typing import Optional
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
+
+SUPPORTED_TIMEZONES = (
+    "UTC",
+    "America/New_York",
+    "America/Chicago",
+    "America/Denver",
+    "America/Los_Angeles",
+    "Europe/London",
+    "Europe/Paris",
+    "Europe/Berlin",
+    "Asia/Tokyo",
+    "Asia/Shanghai",
+    "Asia/Karachi",
+    "Asia/Dubai",
+    "Australia/Sydney",
+)
 
 @dataclass(frozen=True)
 class CalendarEvent:
@@ -14,6 +31,7 @@ class CalendarEvent:
     location: str = ''
     email_id: int | None = None
     source_phrase: str = ''
+    timezone_name: str = 'UTC'
 
 def create_event(
     summary: str,
@@ -23,16 +41,25 @@ def create_event(
     description: str = '',
     location: str = '',
     email_id: int | None = None,
-    source_phrase: str = ''
+    source_phrase: str = '',
+    timezone_name: str = 'UTC',
 ) -> CalendarEvent:
     """Create a CalendarEvent with validation."""
-    if not summary:
+    if not summary or not summary.strip():
         raise ValueError("Summary must be non-empty")
+    summary = summary.strip()
 
     if isinstance(dtstart, datetime):
         if dtstart.tzinfo is None:
-            warnings.warn("Naive datetime provided; treating as UTC.", UserWarning)
-            dtstart = dtstart.replace(tzinfo=timezone.utc)
+            if timezone_name in ('UTC', 'Etc/UTC', ''):
+                tz = timezone.utc
+            else:
+                try:
+                    tz = ZoneInfo(timezone_name)
+                except (ZoneInfoNotFoundError, TypeError):
+                    tz = timezone.utc
+            warnings.warn("Naive datetime provided; treating as specified timezone or UTC.", UserWarning)
+            dtstart = dtstart.replace(tzinfo=tz)
     
     if dtend is not None:
         if isinstance(dtstart, datetime) and not isinstance(dtend, datetime):
@@ -41,8 +68,15 @@ def create_event(
             raise TypeError("dtend must be date if dtstart is date")
         
         if isinstance(dtend, datetime) and dtend.tzinfo is None:
-            warnings.warn("Naive datetime provided for dtend; treating as UTC.", UserWarning)
-            dtend = dtend.replace(tzinfo=timezone.utc)
+            if timezone_name in ('UTC', 'Etc/UTC', ''):
+                tz = timezone.utc
+            else:
+                try:
+                    tz = ZoneInfo(timezone_name)
+                except (ZoneInfoNotFoundError, TypeError):
+                    tz = timezone.utc
+            warnings.warn("Naive datetime provided for dtend; treating as specified timezone or UTC.", UserWarning)
+            dtend = dtend.replace(tzinfo=tz)
             
         if dtend <= dtstart:
             raise ValueError("dtend must be after dtstart")
@@ -54,13 +88,15 @@ def create_event(
         description=description,
         location=location,
         email_id=email_id,
-        source_phrase=source_phrase
+        source_phrase=source_phrase,
+        timezone_name=timezone_name,
     )
 
 def _escape_text(text: str) -> str:
+    # RFC 5545 §3.3.11: backslash, semicolon, comma, newline
     text = text.replace('\\', '\\\\')
-    text = text.replace(',', '\\,')
     text = text.replace(';', '\\;')
+    text = text.replace(',', '\\,')
     text = text.replace('\r\n', '\\n')
     text = text.replace('\n', '\\n')
     return text
@@ -71,19 +107,36 @@ def _format_date(dt: date | datetime) -> str:
     return dt.strftime(";VALUE=DATE:%Y%m%d")
 
 def _fold_line(line: str) -> str:
-    """Fold lines to ensure they do not exceed 75 octets."""
-    result = []
-    # Maximum bytes in a chunk before checking
-    while len(line.encode('utf-8')) > 75:
-        # Find the max characters that fit into 75 bytes
-        for i in range(len(line), 0, -1):
-            if len(line[:i].encode('utf-8')) <= 75:
-                result.append(line[:i])
-                line = line[i:]
-                break
-    if line:
-        result.append(line)
-    return "\r\n ".join(result)
+    """Fold lines to ensure they do not exceed 75 octets per RFC 5545.
+    Continuation lines begin with a space (1 octet), so max continuation chunk is 74 octets.
+    """
+    encoded = line.encode('utf-8')
+    if len(encoded) <= 75:
+        return line
+
+    chunks = []
+    # First line can take up to 75 bytes
+    max_first = 75
+    # Find boundary in line characters that doesn't split a multibyte UTF-8 char
+    idx = len(line)
+    while len(line[:idx].encode('utf-8')) > max_first:
+        idx -= 1
+    chunks.append(line[:idx])
+    remaining = line[idx:]
+
+    # Continuation lines can take up to 74 bytes because of the prepended space
+    while remaining:
+        max_cont = 74
+        if len(remaining.encode('utf-8')) <= max_cont:
+            chunks.append(remaining)
+            break
+        idx = len(remaining)
+        while len(remaining[:idx].encode('utf-8')) > max_cont:
+            idx -= 1
+        chunks.append(remaining[:idx])
+        remaining = remaining[idx:]
+
+    return "\r\n ".join(chunks)
 
 def _build_event_lines(event: CalendarEvent, dtstamp: datetime) -> list[str]:
     uid = f"{uuid.uuid4()}@inboxlearn.local"

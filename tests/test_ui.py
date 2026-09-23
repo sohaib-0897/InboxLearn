@@ -215,3 +215,67 @@ def test_measured_regressions_remain_eligible_for_user_activation(workspace):
     assert not app.button(key=f"activate-{candidate}").disabled
     app.button(key=f"activate-{candidate}").click().run()
     assert workspace.active_version()["id"] == candidate
+
+
+def test_batch_confirmation_ui(workspace):
+    from inboxlearn.demo import demo_data_path
+    workspace.classify_upload(demo_data_path("demo_feedback.csv").read_bytes())
+    
+    app = assert_clean(AppTest.from_file(str(APP), default_timeout=20).run())
+    app.checkbox(key="include_confident").check().run()
+    assert_clean(app)
+
+    # Multi-select 2 messages for batch confirmation
+    inbox = workspace.repo.inbox_rows()
+    id0 = inbox[0]["id"]
+    id1 = inbox[1]["id"]
+    app.multiselect(key="batch_confirm_selection").select(id0).select(id1).run()
+    assert_clean(app)
+
+    # Change batch target labels
+    app.selectbox(key="batch_target_cat").select("promotions").run()
+    app.selectbox(key="batch_target_pri").select("low").run()
+
+    # Click batch confirm button
+    app.button(key="btn_execute_batch_confirm").click().run()
+    assert_clean(app)
+
+    # Verify both feedbacks were committed to repo
+    f0 = workspace.repo.feedback_for_email(id0)
+    f1 = workspace.repo.feedback_for_email(id1)
+    assert len(f0) == 1 and f0[0]["category"] == "promotions" and f0[0]["priority"] == "low"
+    assert len(f1) == 1 and f1[0]["category"] == "promotions" and f1[0]["priority"] == "low"
+
+
+def test_review_filters_ui(workspace):
+    from inboxlearn.demo import demo_data_path
+    workspace.classify_upload(demo_data_path("demo_feedback.csv").read_bytes())
+
+    app = assert_clean(AppTest.from_file(str(APP), default_timeout=20).run())
+    app.checkbox(key="include_confident").check().run()
+
+    inbox = workspace.repo.inbox_rows()
+    target_cat = inbox[0]["category"]
+
+    # Filter by target category
+    app.selectbox(key="review_cat_filter").select(target_cat).run()
+    assert_clean(app)
+    
+    # Selected review email should have target category
+    selected_id = app.selectbox(key="review_email").value
+    email_row = next(r for r in workspace.repo.inbox_rows() if r["id"] == selected_id)
+    assert email_row["category"] == target_cat
+
+
+
+def test_gmail_controls_in_ui(workspace, monkeypatch):
+    # When Gmail is disabled (hosted mode simulation)
+    monkeypatch.setenv("INBOXLEARN_GMAIL_ENABLED", "0")
+    app = assert_clean(AppTest.from_file(str(APP), default_timeout=20).run())
+    assert any("disabled in hosted demo mode" in i.value for i in app.info)
+
+    # When Gmail is enabled (local mode)
+    monkeypatch.setenv("INBOXLEARN_GMAIL_ENABLED", "1")
+    app2 = assert_clean(AppTest.from_file(str(APP), default_timeout=20).run())
+    assert any("CONNECT GMAIL" in m.value for m in app2.markdown)
+

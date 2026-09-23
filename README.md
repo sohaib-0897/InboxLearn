@@ -12,16 +12,17 @@ An email classifier will make mistakes. InboxLearn is a self learning AI agent t
 
 *Actual application screenshot using the supplied synthetic messages. Training membership is visible; agreement on those messages is not held-out accuracy.*
 
-[Demo screenshots](docs/screenshots/README.md) · [Measured results](reports/learning.md) · [Project guide](docs/PROJECT_GUIDE.md) · [Portfolio evidence](PORTFOLIO.md)
+[Demo screenshots](docs/screenshots/README.md) · [Measured results](reports/learning.md) · [Expansion completion report](reports/COMPLETION_REPORT.md) · [Project guide](docs/PROJECT_GUIDE.md) · [Portfolio evidence](PORTFOLIO.md)
 
 ## What it does
 
-- Classifies CSV emails into five categories and three priorities; low-confidence predictions enter a review queue.
-- Puts the least-confident messages first and supports **Save and next**, while retaining original predictions and correction history.
-- Learns only from human-confirmed feedback. New labels update the model incrementally; revised labels trigger a rebuild from seed plus the latest corrections.
-- Prepares immutable, inactive candidates. Repeated preparation reuses the same candidate; newer corrections are flagged without rewriting it.
-- Shows before/after predictions and requires a persisted evaluation on the current held-out dataset before activation. Regressions remain visible, and the user makes the activation decision.
-- Preserves earlier models for rollback. Suggested email actions are informational; the application does not send, delete or pay anything.
+- **Multi-format intake:** Ingests emails from CSV, single `.eml` files, `.mbox` archives, and a local read-only Gmail API connector.
+- **Triage & Classification:** Classifies incoming messages into five categories and three priorities; uncertain predictions route to the review queue.
+- **Review Desk & Batch Confirmation:** Review with **Save and next** or apply **Batch confirmation** to multi-selected messages; filter by category, priority, review state, and import batch.
+- **Entity Awareness & Calendar Export:** Extracts dates, deadlines, monetary amounts, action items, and contacts. Interactive form lets users confirm title, date, time, and timezone before downloading an RFC 5545 `.ics` file.
+- **Human-in-the-loop Learning:** Learns only from human-confirmed feedback. New labels update incrementally; revisions trigger a clean rebuild from seed plus latest corrections.
+- **Safe Activation & Lineage:** Prepares immutable, inactive candidate models; before/after prediction comparison and held-out evaluation are required before activation. Rollback restores earlier versions instantly.
+- **Read-only Safety:** Zero external email writes, no drafts, no deletion, and no remote state changes. Sensitive tokens are protected via Windows DPAPI.
 
 ## Engineering decisions worth reviewing
 
@@ -80,8 +81,10 @@ Open **http://localhost:8501**. Use **Classify demonstration sample**, then conf
 Uploads require UTF-8 CSV with `subject` and `body`; `sender` is optional. Data stays in `runtime/inboxlearn.sqlite3`, which is excluded from Git. The app binds to localhost and disables Streamlit usage telemetry. [Configuration, CSV rules and detailed walkthrough](docs/PROJECT_GUIDE.md)
 
 ## Verification
+ 
+The local verification completed **105 tests** across 10 test modules, an isolated dependency check, and the full Chrome workflow at **1440×1000** and **390×844** viewports. Tests cover real email parsers (.eml, .mbox), regex entity extraction, RFC 5545 calendar generation, V2 schema migrations, model updates, feedback revisions, concurrent candidate preparation, candidate activation gates, rollback, CSV validation, Gmail connector error paths, and native UI states through Streamlit AppTest.
 
-The local verification completed **30 tests**, an isolated dependency check, and the full Chrome workflow at **1440×1000** and **390×844** viewports. Tests cover actual model updates, revisions, concurrent preparation, evaluation gates, read-only previews, rollback, CSV validation and native UI states through Streamlit AppTest. Browser captures are real and use only synthetic data; mobile checks use a viewport, not a physical phone.
+Every acceptance criterion from the expansion plan is reconciled in [`reports/COMPLETION_REPORT.md`](reports/COMPLETION_REPORT.md).
 
 After activating the virtual environment, run:
 
