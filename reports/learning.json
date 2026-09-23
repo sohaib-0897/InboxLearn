@@ -81,13 +81,13 @@
   "data_type": "Synthetic demonstration data; not a real-world accuracy estimate.",
   "dependencies": {
     "joblib": "1.6.0",
-    "numpy": "2.5.3",
+    "numpy": "2.4.4",
     "pandas": "2.3.3",
     "pytest": "9.1.1",
     "python": "3.12.9",
     "scikit-learn": "1.9.1",
     "scipy": "1.18.1",
-    "streamlit": "1.63.0",
+    "streamlit": "1.57.0",
     "threadpoolctl": "3.6.0"
   },
   "heldout_hash": "b2d79a373efe2dfc45022b251c78e45eb28eb819edb144b23201a0019915db08",
@@ -641,7 +641,7 @@
     "inboxlearn/config.py": "08ef3c7c9c555e3385b18ddb9d717c04e8be80df034fead092f1424ce705635d",
     "inboxlearn/db.py": "fe6461a0962224b99217f0f3b63bf0c218dc959f9c4e5a56fe352ba4acb75481",
     "inboxlearn/evaluation.py": "50d07573bccd9b3a8c9b82906ebd361e5be8f072de2972ead28b599fbffd32de",
-    "inboxlearn/service.py": "89a25bc7fd7376ee7e78e5ad93daeb8d3ae0a12ec10e09040adb8ddfd26a8d14",
+    "inboxlearn/service.py": "9c701b15dbac5edbb9aaf3165180a0bdc6cfeb202feb78147b88338b0f4f5ca2",
     "inboxlearn/validation.py": "44986f152c642ddfcc61f6a81011d4aac895c7c8846b1f116ee9970d5f729203",
     "scripts/experiment.py": "5fb04ad7b8b60553dafc4386735680d14b76778fd5a04d7599ecb004e5e3a4c8"
   },
