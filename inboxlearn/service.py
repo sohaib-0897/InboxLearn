@@ -320,7 +320,7 @@ class InboxLearnService:
         return self.repo.save_feedback(email_id, category, priority)
 
     def review_rows(self, *, include_confident: bool = False, order: str = "Lowest confidence first",
-                    category="All categories", priority="All priorities", import_batch="All batches", unresolved=False) -> list[dict]:
+                    category="All categories", priority="All priorities", import_batch="All batches", unresolved=False, **kwargs) -> list[dict]:
         result = []
         for raw in self.repo.inbox_rows(review_only=False, include_confident=include_confident):
             row = _row_dict(raw)

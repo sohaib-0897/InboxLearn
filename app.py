@@ -1,9 +1,13 @@
 """Native Streamlit presentation over the existing InboxLearn service."""
+import importlib
+import inspect
 import json
+import sys
 import uuid
 from datetime import date, datetime, time as dt_time
 from math import ceil
 from pathlib import Path
+
 
 import pandas as pd
 import streamlit as st
@@ -22,9 +26,45 @@ from inboxlearn.presentation import (
 
 st.set_page_config(page_title="InboxLearn", page_icon="✉", layout="wide", initial_sidebar_state="collapsed")
 
-APP_VERSION = "2.3.0"
+APP_VERSION = "2.3.2"
 
-# Ensure InboxLearnService class definition has gmail and action journal methods even if an older instance was in memory
+# Invalidate cached resources if previous session had an older version
+if hasattr(st, "session_state"):
+    if st.session_state.get("_loaded_app_version") != APP_VERSION:
+        try:
+            st.cache_resource.clear()
+        except Exception:
+            pass
+        st.session_state["_loaded_app_version"] = APP_VERSION
+
+
+def _safe_review_rows(service: InboxLearnService, **kwargs) -> list[dict]:
+    """Call service.review_rows safely, adapting to any cached or legacy signature."""
+    try:
+        sig = inspect.signature(service.review_rows)
+        has_var_kwargs = any(p.kind == inspect.Parameter.VAR_KEYWORD for p in sig.parameters.values())
+        accepted = {k: v for k, v in kwargs.items() if has_var_kwargs or k in sig.parameters}
+        rows = service.review_rows(**accepted)
+    except TypeError:
+        fallback_kwargs = {k: v for k, v in kwargs.items() if k in ("include_confident", "order")}
+        rows = service.review_rows(**fallback_kwargs)
+        accepted = fallback_kwargs
+
+    if "category" not in accepted and "category" in kwargs and kwargs["category"] != "All categories":
+        rows = [r for r in rows if r.get("effective_category", r.get("category")) == kwargs["category"]]
+    if "priority" not in accepted and "priority" in kwargs and kwargs["priority"] != "All priorities":
+        rows = [r for r in rows if r.get("effective_priority", r.get("priority")) == kwargs["priority"]]
+    if "import_batch" not in accepted and "import_batch" in kwargs and kwargs["import_batch"] != "All batches":
+        rows = [r for r in rows if r.get("import_batch") == kwargs["import_batch"]]
+    if "unresolved" not in accepted and kwargs.get("unresolved"):
+        rows = [r for r in rows if r.get("feedback_id") is None]
+    return rows
+
+
+# Ensure InboxLearnService class definition has gmail, action journal, and updated review_rows methods even if an older instance was in memory
+if "category" not in inspect.signature(InboxLearnService.review_rows).parameters:
+    InboxLearnService.review_rows = _safe_review_rows
+
 if not hasattr(InboxLearnService, "gmail_status"):
     from inboxlearn.gmail import (
         CredentialStore as _CS, GmailClient as _GC, is_gmail_enabled as _ige,
@@ -59,10 +99,38 @@ if not hasattr(InboxLearnService, "gmail_status"):
     InboxLearnService.disconnect_gmail = _fallback_disconnect_gmail
 
 if not hasattr(InboxLearnService, "stage_action"):
-    InboxLearnService.stage_action = lambda self, email_id, action_type, payload=None: self.repo.save_action(email_id, action_type, payload or {})
+    InboxLearnService.stage_action = lambda self, email_id, action_type, payload=None, due_date=None: self.repo.save_action(email_id, action_type, payload or {}, str(due_date) if due_date else None)
     InboxLearnService.execute_action = lambda self, action_id: self.repo.execute_action(action_id)
     InboxLearnService.revert_action = lambda self, action_id: self.repo.revert_action(action_id)
     InboxLearnService.email_actions = lambda self, email_id: [dict(r) for r in self.repo.actions_for_email(email_id)]
+
+if not hasattr(InboxLearnService, "follow_ups"):
+    def _fallback_follow_ups(self, *, today=None):
+        today_str = (today or date.today()).isoformat()
+        try:
+            rows = [dict(r) for r in self.repo._all("""SELECT a.*, e.subject, e.sender FROM action_journal a
+                JOIN emails e ON e.id=a.email_id ORDER BY a.due_date IS NULL, a.due_date, a.id""")]
+            for row in rows:
+                due = row.get('due_date')
+                row['group'] = ('History' if row.get('status') != 'staged' else 'No due date' if not due
+                                else 'Overdue' if due < today_str else 'Today' if due == today_str else 'Upcoming')
+            return rows
+        except Exception:
+            return []
+    InboxLearnService.follow_ups = _fallback_follow_ups
+
+if not hasattr(InboxLearnService, "reopen_action"):
+    def _fallback_reopen(self, action_id: int):
+        with self.repo.training_transaction() as conn:
+            conn.execute("UPDATE action_journal SET status='staged', executed_at=NULL WHERE id=?", (action_id,))
+    InboxLearnService.reopen_action = _fallback_reopen
+
+if not hasattr(InboxLearnService, "edit_action_due_date"):
+    def _fallback_edit_due(self, action_id: int, due_date=None):
+        val = date.fromisoformat(str(due_date)).isoformat() if due_date is not None else None
+        with self.repo.training_transaction() as conn:
+            conn.execute("UPDATE action_journal SET due_date=? WHERE id=?", (val, action_id))
+    InboxLearnService.edit_action_due_date = _fallback_edit_due
 
 
 @st.cache_resource
@@ -230,7 +298,7 @@ def render_today(service):
         if st.button("Classify demonstration sample", key="today_demo"):
             classify(service, demo_data_path("demo_feedback.csv").read_bytes(), "demonstration")
         return
-    pending = service.review_rows()
+    pending = _safe_review_rows(service)
     st.subheader(f"Pending reviews ({len(pending)})")
     if not pending:
         st.caption("No uncertain messages await review.")
@@ -373,7 +441,7 @@ def render_upload(service: InboxLearnService) -> None:
                     except Exception as exc:
                         st.error(f"Disconnect failed: {exc}")
 
-    rows = service.review_rows(include_confident=True)
+    rows = _safe_review_rows(service, include_confident=True)
     if not rows:
         st.info("Your inbox is empty. Upload a CSV, .eml, or .mbox file, connect Gmail, or classify the demonstration sample above.")
         return
@@ -461,7 +529,7 @@ def render_review(service: InboxLearnService) -> None:
     if st.session_state.pop("review_complete", False):
         st.success("Review complete: no unresolved messages remain in this queue.")
 
-    rows = service.review_rows(**queue_options)
+    rows = _safe_review_rows(service, **queue_options)
 
     if not rows:
         st.info("The review queue is empty for these filters. Clear filters or check 'Include confident predictions' to review other messages.")
@@ -550,7 +618,7 @@ def render_review(service: InboxLearnService) -> None:
                 try:
                     correction_id, created = service.save_feedback(int(row["id"]), category, priority)
                     if save_next:
-                        unresolved = [r for r in service.review_rows(**queue_options, unresolved=True)]
+                        unresolved = [r for r in _safe_review_rows(service, **queue_options, unresolved=True)]
                         if unresolved:
                             st.session_state["next_review_email"] = unresolved[0]["id"]
                         else:
