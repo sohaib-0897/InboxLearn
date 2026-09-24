@@ -81,6 +81,8 @@ Open **http://localhost:8501**. Use **Classify demonstration sample**, then conf
 
 Uploads require UTF-8 CSV with `subject` and `body`; `sender` is optional. Data stays in `runtime/inboxlearn.sqlite3`, which is excluded from Git. The app binds to localhost and disables Streamlit usage telemetry. [Configuration, CSV rules and detailed walkthrough](docs/PROJECT_GUIDE.md)
 
+Gmail is disabled by default, including in hosted demos. The Upload tab shows a disabled **Connect Gmail account** button without asking for credentials. The existing local OAuth connector can be enabled explicitly with `INBOXLEARN_GMAIL_ENABLED=1`; `INBOXLEARN_HOSTED=1` always disables it. Its status reports stored local credentials without contacting Google, and `last_sync` remains `null` because sync times are not tracked. CSV, EML, MBOX and demonstration imports work without Gmail.
+
 ## Verification
  
 The local verification completed **115 tests** across 11 test modules, and the full Chrome workflow at **1440×1000** and **390×844** viewports. Tests cover real email parsers (.eml, .mbox), regex entity extraction, RFC 5545 calendar generation, V2 schema migrations, model updates, feedback revisions, concurrent candidate preparation, candidate activation gates, rollback, CSV validation, Gmail connector error paths, and native UI states through Streamlit AppTest.

@@ -26,16 +26,7 @@ from inboxlearn.presentation import (
 
 st.set_page_config(page_title="InboxLearn", page_icon="✉", layout="wide", initial_sidebar_state="collapsed")
 
-APP_VERSION = "2.3.2"
-
-# Invalidate cached resources if previous session had an older version
-if hasattr(st, "session_state"):
-    if st.session_state.get("_loaded_app_version") != APP_VERSION:
-        try:
-            st.cache_resource.clear()
-        except Exception:
-            pass
-        st.session_state["_loaded_app_version"] = APP_VERSION
+APP_VERSION = "2.3.3"
 
 
 def _safe_review_rows(service: InboxLearnService, **kwargs) -> list[dict]:
@@ -61,42 +52,8 @@ def _safe_review_rows(service: InboxLearnService, **kwargs) -> list[dict]:
     return rows
 
 
-# Ensure InboxLearnService class definition has gmail, action journal, and updated review_rows methods even if an older instance was in memory
 if "category" not in inspect.signature(InboxLearnService.review_rows).parameters:
     InboxLearnService.review_rows = _safe_review_rows
-
-if not hasattr(InboxLearnService, "gmail_status"):
-    from inboxlearn.gmail import (
-        CredentialStore as _CS, GmailClient as _GC, is_gmail_enabled as _ige,
-        sync_gmail as _sgm, disconnect_gmail as _dgm
-    )
-    def _fallback_gmail_status(self, storage_dir="runtime/credentials"):
-        if not _ige():
-            return {"enabled": False, "connected": False, "reason": "Disabled in hosted/demo mode."}
-        store = _CS(storage_dir=storage_dir)
-        tokens = store.load_tokens()
-        if not tokens:
-            return {"enabled": True, "connected": False}
-        return {
-            "enabled": True,
-            "connected": True,
-            "account_email": tokens.get("account_email", "unknown"),
-            "saved_at": tokens.get("saved_at", ""),
-            "protected_by": tokens.get("protected_by", "file"),
-        }
-
-    def _fallback_sync_gmail(self, client_id, client_secret, *, days=30, max_messages=100, storage_dir="runtime/credentials", cancel_check=None, progress_callback=None):
-        store = _CS(storage_dir=storage_dir)
-        client = _GC(store, client_id=client_id, client_secret=client_secret)
-        return _sgm(self, client, days=days, max_messages=max_messages, cancel_check=cancel_check, progress_callback=progress_callback)
-
-    def _fallback_disconnect_gmail(self, client_id, client_secret, storage_dir="runtime/credentials"):
-        store = _CS(storage_dir=storage_dir)
-        return _dgm(store, client_id=client_id, client_secret=client_secret)
-
-    InboxLearnService.gmail_status = _fallback_gmail_status
-    InboxLearnService.sync_gmail = _fallback_sync_gmail
-    InboxLearnService.disconnect_gmail = _fallback_disconnect_gmail
 
 if not hasattr(InboxLearnService, "stage_action"):
     InboxLearnService.stage_action = lambda self, email_id, action_type, payload=None, due_date=None: self.repo.save_action(email_id, action_type, payload or {}, str(due_date) if due_date else None)
@@ -379,15 +336,11 @@ def render_upload(service: InboxLearnService) -> None:
                 classify(service, demo_data_path("demo_feedback.csv").read_bytes(), "demonstration")
             st.caption("Five synthetic messages. Classification does not save feedback. Review each label yourself.")
 
-    # Gmail connection & sync section
-    if hasattr(service, "gmail_status"):
-        gmail_info = service.gmail_status()
-    else:
-        from inboxlearn.gmail import is_gmail_enabled
-        gmail_info = {"enabled": is_gmail_enabled(), "connected": False}
+    gmail_info = service.gmail_status()
     with st.expander("Gmail connection (Read-only)", expanded=False):
         if not gmail_info["enabled"]:
-            st.info("Gmail integration is disabled in hosted demo mode. It is available when running InboxLearn locally on your machine.")
+            st.info(gmail_info["message"])
+            st.button("Connect Gmail account", disabled=True, key="btn_connect_gmail")
         elif not gmail_info["connected"]:
             st.markdown("**CONNECT GMAIL (READ-ONLY)**")
             st.caption("Local desktop OAuth 2.0 PKCE flow. Opens your system browser to grant read-only access. No emails will be sent, modified, or deleted.")
@@ -412,7 +365,8 @@ def render_upload(service: InboxLearnService) -> None:
                 except Exception as exc:
                     st.error(f"Gmail connection failed: {exc}")
         else:
-            st.success(f"Connected account: **{gmail_info.get('account_email')}** (Read-only access)")
+            st.success(f"Stored Gmail account: **{gmail_info['email']}** (Read-only access)")
+            st.caption(gmail_info["message"])
             st.caption(f"Credentials protected by {gmail_info.get('protected_by')}. Read-only scope: no remote state is modified.")
             w_col, c_col = st.columns(2)
             with w_col:
@@ -426,7 +380,7 @@ def render_upload(service: InboxLearnService) -> None:
                     try:
                         cid = st.session_state.get("gmail_client_id", "")
                         csec = st.session_state.get("gmail_client_secret", "")
-                        with st.spinner(f"Fetching recent messages from {gmail_info.get('account_email')}…"):
+                        with st.spinner(f"Fetching recent messages from {gmail_info['email']}…"):
                             res = service.sync_gmail(cid, csec, days=sync_days, max_messages=sync_cap)
                         flash(f"Gmail sync complete: {res['new']} imported, {res['duplicates']} duplicates skipped, {res['warnings']} warnings.")
                     except Exception as exc:
@@ -443,7 +397,7 @@ def render_upload(service: InboxLearnService) -> None:
 
     rows = _safe_review_rows(service, include_confident=True)
     if not rows:
-        st.info("Your inbox is empty. Upload a CSV, .eml, or .mbox file, connect Gmail, or classify the demonstration sample above.")
+        st.info("Your inbox is empty. Upload a CSV, .eml, or .mbox file, or classify the demonstration sample above.")
         return
     batches = service.import_batches()
     batch_options = ["All batches"] + [b["import_batch"] for b in batches] if batches else []

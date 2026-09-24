@@ -62,14 +62,14 @@ class GmailSyncCancelled(GmailError):
 
 def is_gmail_enabled() -> bool:
     """Check if Gmail connector is enabled for this environment.
-    Disabled by default on public hosted deployments (e.g. Streamlit Cloud).
+    Requires explicit local opt-in; hosted demo flags always disable it.
     """
-    if os.getenv("INBOXLEARN_GMAIL_ENABLED", "1").strip().lower() in ("0", "false", "no"):
+    if os.getenv("INBOXLEARN_GMAIL_ENABLED", "0").strip().lower() not in ("1", "true", "yes", "on"):
         return False
     # Check common hosted environment flags
     if os.getenv("STREAMLIT_SERVER_IS_RUNNING") and os.getenv("HOSTNAME", "").startswith("streamlit"):
         return False
-    if os.getenv("INBOXLEARN_HOSTED", "0") == "1":
+    if os.getenv("INBOXLEARN_HOSTED", "0").strip().lower() in ("1", "true", "yes", "on"):
         return False
     return True
 

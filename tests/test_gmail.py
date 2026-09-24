@@ -319,6 +319,60 @@ def test_disconnect_and_token_revocation(tmp_path, monkeypatch):
     assert revocation_called is True
 
 
+@pytest.mark.parametrize("environment", [
+    {},
+    {"INBOXLEARN_GMAIL_ENABLED": "0"},
+    {"INBOXLEARN_GMAIL_ENABLED": "invalid"},
+    {"INBOXLEARN_GMAIL_ENABLED": "1", "INBOXLEARN_HOSTED": "1"},
+    {"INBOXLEARN_GMAIL_ENABLED": "1", "INBOXLEARN_HOSTED": " true "},
+    {"INBOXLEARN_GMAIL_ENABLED": "1", "STREAMLIT_SERVER_IS_RUNNING": "1", "HOSTNAME": "streamlit-demo"},
+])
+def test_service_gmail_disabled_status_avoids_credentials_and_network(tmp_path, monkeypatch, environment):
+    for name in ("INBOXLEARN_GMAIL_ENABLED", "INBOXLEARN_HOSTED", "STREAMLIT_SERVER_IS_RUNNING", "HOSTNAME"):
+        monkeypatch.delenv(name, raising=False)
+    for name, value in environment.items():
+        monkeypatch.setenv(name, value)
+
+    def forbidden_access(*args, **kwargs):
+        pytest.fail("Disabled Gmail must not access credentials or the network")
+
+    monkeypatch.setattr("inboxlearn.gmail.CredentialStore", forbidden_access)
+    monkeypatch.setattr("inboxlearn.gmail.urllib.request.urlopen", forbidden_access)
+    service = InboxLearnService(Settings(db_path=tmp_path / "status.db"))
+    assert service.gmail_status(storage_dir=str(tmp_path / "credentials")) == {
+        "enabled": False,
+        "connected": False,
+        "email": None,
+        "last_sync": None,
+        "message": "Gmail integration is disabled in hosted demo mode.",
+    }
+    assert not (tmp_path / "credentials").exists()
+
+
+@pytest.mark.parametrize("stored_tokens", [None, {}, {"access_token": "offline-test-token"}])
+def test_service_gmail_local_status_uses_stored_credentials(tmp_path, monkeypatch, stored_tokens):
+    monkeypatch.setenv("INBOXLEARN_GMAIL_ENABLED", "1")
+    monkeypatch.delenv("INBOXLEARN_HOSTED", raising=False)
+    monkeypatch.delenv("STREAMLIT_SERVER_IS_RUNNING", raising=False)
+
+    def forbidden_network(*args, **kwargs):
+        pytest.fail("Reading Gmail status must not contact Google")
+
+    monkeypatch.setattr("inboxlearn.gmail.urllib.request.urlopen", forbidden_network)
+    storage_dir = tmp_path / "credentials"
+    if stored_tokens is not None:
+        CredentialStore(storage_dir).save_tokens("user@example.test", stored_tokens)
+    service = InboxLearnService(Settings(db_path=tmp_path / "status.db"))
+    status = service.gmail_status(storage_dir=str(storage_dir))
+    assert status["enabled"] is True
+    assert status["connected"] is bool(stored_tokens)
+    assert status["email"] == ("user@example.test" if stored_tokens else None)
+    assert status["last_sync"] is None
+    assert "tokens" not in status
+    if stored_tokens:
+        assert "Access is checked on the next sync" in status["message"]
+
+
 def test_is_gmail_enabled_hosted_detection(monkeypatch):
     monkeypatch.setenv("INBOXLEARN_GMAIL_ENABLED", "1")
     monkeypatch.delenv("STREAMLIT_SERVER_IS_RUNNING", raising=False)
@@ -412,4 +466,3 @@ def test_transient_retry_and_backoff(tmp_path, monkeypatch):
     profile = client.get_profile()
     assert profile["emailAddress"] == "test@test.com"
     assert attempts == 3
-

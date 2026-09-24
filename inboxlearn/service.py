@@ -5,7 +5,7 @@ import importlib.metadata
 import io
 import json
 import sys
-from typing import Callable
+from typing import Callable, NotRequired, TypedDict
 
 from .classifier import deserialize_bundle, serialize_bundle, train_bundle
 from .config import CATEGORIES, PRIORITIES, Settings
@@ -18,6 +18,15 @@ from .validation import content_hash, parse_csv_bytes, split_key
 
 
 TRAINING_RECIPE_VERSION = "sgd-feedback-v1"
+
+
+class GmailStatus(TypedDict):
+    enabled: bool
+    connected: bool
+    email: str | None
+    last_sync: str | None
+    message: str
+    protected_by: NotRequired[str]
 
 
 ACTION_SUGGESTIONS = {
@@ -256,25 +265,33 @@ class InboxLearnService:
         """Get action journal entries for an email as plain dicts."""
         return [dict(row) for row in self.repo.actions_for_email(email_id)]
 
-    def gmail_status(self, storage_dir: str = "runtime/credentials") -> dict:
-        """Check status of local Gmail connection."""
+    def gmail_status(self, storage_dir: str = "runtime/credentials") -> GmailStatus:
+        """Report local credential availability without contacting Gmail."""
         from .gmail import CredentialStore, is_gmail_enabled
-        enabled = is_gmail_enabled()
-        if not enabled:
-            return {"enabled": False, "connected": False, "reason": "Disabled in hosted/demo mode."}
+        status: GmailStatus = {
+            "enabled": is_gmail_enabled(),
+            "connected": False,
+            "email": None,
+            "last_sync": None,
+            "message": "Gmail integration is disabled in hosted demo mode.",
+        }
+        if not status["enabled"]:
+            return status
 
         store = CredentialStore(storage_dir=storage_dir)
-        tokens = store.load_tokens()
-        if not tokens:
-            return {"enabled": True, "connected": False}
+        record = store.load_tokens()
+        status["message"] = "No Gmail account is connected. Local read-only OAuth is available."
+        if not record or not record.get("account_email"):
+            return status
+        tokens = record.get("tokens", {})
+        if not (tokens.get("access_token") or tokens.get("refresh_token")):
+            return status
 
-        return {
-            "enabled": True,
-            "connected": True,
-            "account_email": tokens.get("account_email", "unknown"),
-            "saved_at": tokens.get("saved_at", ""),
-            "protected_by": tokens.get("protected_by", "file"),
-        }
+        status["connected"] = True
+        status["email"] = record["account_email"]
+        status["protected_by"] = record.get("protected_by", "file")
+        status["message"] = "Local Gmail credentials are stored. Access is checked on the next sync; last sync is not tracked."
+        return status
 
     def sync_gmail(
         self,

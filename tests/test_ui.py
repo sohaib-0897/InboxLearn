@@ -268,16 +268,66 @@ def test_review_filters_ui(workspace):
 
 
 
-def test_gmail_controls_in_ui(workspace, monkeypatch):
-    # When Gmail is disabled (hosted mode simulation)
-    monkeypatch.setenv("INBOXLEARN_GMAIL_ENABLED", "0")
-    app = assert_clean(AppTest.from_file(str(APP), default_timeout=20).run())
-    assert any("disabled in hosted demo mode" in i.value for i in app.info)
+@pytest.mark.parametrize("environment", [
+    {},
+    {"INBOXLEARN_GMAIL_ENABLED": "0"},
+    {"INBOXLEARN_GMAIL_ENABLED": "1", "INBOXLEARN_HOSTED": "1"},
+    {"INBOXLEARN_GMAIL_ENABLED": "1", "STREAMLIT_SERVER_IS_RUNNING": "1", "HOSTNAME": "streamlit-demo"},
+])
+def test_upload_renders_with_gmail_disabled(workspace, monkeypatch, environment):
+    for name in ("INBOXLEARN_GMAIL_ENABLED", "INBOXLEARN_HOSTED", "STREAMLIT_SERVER_IS_RUNNING", "HOSTNAME"):
+        monkeypatch.delenv(name, raising=False)
+    for name, value in environment.items():
+        monkeypatch.setenv(name, value)
 
-    # When Gmail is enabled (local mode)
+    def forbidden_gmail_access(*args, **kwargs):
+        pytest.fail("Disabled Gmail must not access credentials or start OAuth")
+
+    monkeypatch.setattr("inboxlearn.gmail.CredentialStore", forbidden_gmail_access)
+    monkeypatch.setattr("inboxlearn.gmail.run_oauth_flow", forbidden_gmail_access)
+    app = assert_clean(AppTest.from_file(str(APP), default_timeout=20).run())
+    assert "Upload / Inbox" in [tab.label for tab in app.tabs]
+    assert any("Gmail integration is disabled in hosted demo mode." == info.value for info in app.info)
+    assert app.button(key="btn_connect_gmail").disabled
+    assert not any(field.key in ("input_gmail_client_id", "input_gmail_client_secret") for field in app.text_input)
+    assert not any(button.key in ("btn_run_gmail_sync", "btn_disconnect_gmail_account") for button in app.button)
+    assert not app.button(key="demo_classify").disabled
+    app.button(key="demo_classify").click().run()
+    assert_clean(app)
+    assert len(workspace.repo.inbox_rows()) == 5
+    assert app.button(key="btn_connect_gmail").disabled
+
+
+@pytest.mark.parametrize("filename", ["messages.csv", "message.eml", "messages.mbox"])
+def test_file_upload_works_with_gmail_disabled(workspace, monkeypatch, filename):
+    monkeypatch.setenv("INBOXLEARN_GMAIL_ENABLED", "0")
+    email_bytes = b"From: sender@example.test\nSubject: Invoice due tomorrow\n\nPlease review this invoice.\n"
+    payloads = {
+        "messages.csv": b"subject,body,sender\nInvoice due tomorrow,Please review this invoice.,sender@example.test\n",
+        "message.eml": email_bytes,
+        "messages.mbox": b"From sender@example.test Wed Sep 23 08:00:00 2026\n" + email_bytes,
+    }
+    upload = io.BytesIO(payloads[filename])
+    upload.name = filename
+    monkeypatch.setattr("streamlit.file_uploader", lambda *args, **kwargs: upload)
+    app = assert_clean(AppTest.from_file(str(APP), default_timeout=20).run())
+    app.button(key="classify_csv").click().run()
+    assert_clean(app)
+    assert len(workspace.repo.inbox_rows()) == 1
+    assert app.button(key="btn_connect_gmail").disabled
+
+
+def test_gmail_controls_follow_hosted_setting_on_rerun(workspace, monkeypatch):
     monkeypatch.setenv("INBOXLEARN_GMAIL_ENABLED", "1")
-    app2 = assert_clean(AppTest.from_file(str(APP), default_timeout=20).run())
-    assert any("CONNECT GMAIL" in m.value for m in app2.markdown)
+    monkeypatch.delenv("INBOXLEARN_HOSTED", raising=False)
+    monkeypatch.delenv("STREAMLIT_SERVER_IS_RUNNING", raising=False)
+    monkeypatch.setattr("inboxlearn.gmail.CredentialStore.load_tokens", lambda self: None)
+    app = assert_clean(AppTest.from_file(str(APP), default_timeout=20).run())
+    assert any("CONNECT GMAIL" in markdown.value for markdown in app.markdown)
+    monkeypatch.setenv("INBOXLEARN_HOSTED", "1")
+    assert_clean(app.run())
+    assert app.button(key="btn_connect_gmail").disabled
+    assert not any(field.key in ("input_gmail_client_id", "input_gmail_client_secret") for field in app.text_input)
 
 
 def test_show_email_extended_metadata(monkeypatch):
