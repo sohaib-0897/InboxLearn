@@ -58,6 +58,13 @@
   let currentEmailIndex = 0;
   let simulatedCorrectionsCount = 0;
 
+  function makeElement(tagName, className, text) {
+    const element = document.createElement(tagName);
+    if (className) element.className = className;
+    if (text) element.textContent = text;
+    return element;
+  }
+
   // DOM Elements
   const mobileToggle = document.getElementById('mobileNavToggle');
   const mobileDrawer = document.getElementById('mobileNavDrawer');
@@ -132,15 +139,18 @@
     if (statPredCategory) statPredCategory.textContent = email.predCategory;
     if (statPredPriority) statPredPriority.textContent = email.predPriority;
     if (statConfidence) {
-      statConfidence.innerHTML = `${email.confidence} <span class="uncalibrated-notice">(Uncalibrated raw sigmoid estimate)</span>`;
+      statConfidence.replaceChildren(
+        document.createTextNode(`${email.confidence} `),
+        makeElement('span', 'uncalibrated-notice', '(Uncalibrated raw sigmoid estimate)')
+      );
     }
 
     if (statReviewStatus) {
-      if (email.needsReview) {
-        statReviewStatus.innerHTML = `<span class="badge badge-accent">Needs Review</span> <small style="display:block;margin-top:2px;color:var(--np-secondary)">${email.reason}</small>`;
-      } else {
-        statReviewStatus.innerHTML = `<span class="badge badge-ink">Confident</span> <small style="display:block;margin-top:2px;color:var(--np-secondary)">${email.reason}</small>`;
-      }
+      const badge = makeElement('span', email.needsReview ? 'badge badge-accent' : 'badge badge-ink',
+        email.needsReview ? 'Needs Review' : 'Confident');
+      const reason = makeElement('small', '', email.reason);
+      reason.style.cssText = 'display:block;margin-top:2px;color:var(--np-secondary)';
+      statReviewStatus.replaceChildren(badge, reason);
     }
 
     if (statModelVersion) {
@@ -152,32 +162,34 @@
     if (formCorrectionPriority) formCorrectionPriority.value = email.predPriority;
 
     if (consoleStatusMsg) {
-      consoleStatusMsg.textContent = `Viewing email #${email.id} from local cache. Active model: ${email.modelVersion}`;
+      consoleStatusMsg.textContent = `Previewing synthetic email #${email.id}. Predictions are illustrative; nothing is saved or trained.`;
     }
   }
 
   // --- Populate Email List in Mockup ---
   if (emailListEl) {
-    emailListEl.innerHTML = '';
+    emailListEl.replaceChildren();
     DEMO_EMAILS.forEach((email, idx) => {
       const li = document.createElement('li');
-      li.innerHTML = `
-        <button type="button" class="email-item-btn ${idx === 0 ? 'is-active' : ''}" role="tab" aria-selected="${idx === 0 ? 'true' : 'false'}">
-          <div class="email-item-header">
-            <span>#0${email.id}</span>
-            <span>${email.date}</span>
-          </div>
-          <div class="email-item-subject">${email.subject}</div>
-          <div class="email-item-snippet">${email.snippet}</div>
-          <div>
-            <span class="email-item-tag">${email.predCategory}</span>
-            ${email.needsReview ? '<span class="badge badge-accent" style="font-size:0.6rem;padding:1px 4px;">Review</span>' : ''}
-          </div>
-        </button>
-      `;
-      li.querySelector('button').addEventListener('click', () => {
+      const button = makeElement('button', `email-item-btn ${idx === 0 ? 'is-active' : ''}`);
+      button.type = 'button';
+      button.setAttribute('role', 'tab');
+      button.setAttribute('aria-selected', idx === 0 ? 'true' : 'false');
+      const header = makeElement('div', 'email-item-header');
+      header.append(makeElement('span', '', `#0${email.id}`), makeElement('span', '', email.date));
+      const tags = makeElement('div');
+      tags.append(makeElement('span', 'email-item-tag', email.predCategory));
+      if (email.needsReview) {
+        const badge = makeElement('span', 'badge badge-accent', 'Review');
+        badge.style.cssText = 'font-size:0.6rem;padding:1px 4px;';
+        tags.append(badge);
+      }
+      button.append(header, makeElement('div', 'email-item-subject', email.subject),
+        makeElement('div', 'email-item-snippet', email.snippet), tags);
+      button.addEventListener('click', () => {
         renderEmail(idx);
       });
+      li.append(button);
       emailListEl.appendChild(li);
     });
     // Initial render
@@ -198,16 +210,20 @@
       }
 
       if (consoleStatusMsg) {
-        consoleStatusMsg.innerHTML = `<strong style="color:var(--np-accent);">[PERSISTED TO SQLITE]</strong> Logged human verification for #${email.id} (${selectedCat}, ${selectedPri}). Active model weights unchanged. Candidate snapshot queued for held-out evaluation.`;
+        const label = makeElement('strong', '', '[PREVIEW ONLY]');
+        label.style.color = 'var(--np-accent)';
+        consoleStatusMsg.replaceChildren(label, document.createTextNode(
+          ` Simulated correction for #${email.id} (${selectedCat}, ${selectedPri}). Nothing was saved to SQLite or queued for training. Open InboxLearn to save real feedback.`
+        ));
       }
 
       // Briefly animate button
-      const origText = btnSaveCorrection.innerHTML;
-      btnSaveCorrection.innerHTML = `✓ Saved & Verified #${email.id}`;
+      const originalContent = [...btnSaveCorrection.childNodes];
+      btnSaveCorrection.textContent = `✓ Previewed #${email.id}`;
       btnSaveCorrection.disabled = true;
 
       setTimeout(() => {
-        btnSaveCorrection.innerHTML = origText;
+        btnSaveCorrection.replaceChildren(...originalContent);
         btnSaveCorrection.disabled = false;
         // Advance to next email if available
         const nextIndex = (currentEmailIndex + 1) % DEMO_EMAILS.length;

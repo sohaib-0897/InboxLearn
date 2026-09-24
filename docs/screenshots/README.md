@@ -6,6 +6,7 @@ The five labels in `data/demo_feedback.csv` are replayed through the review form
 
 | Desktop / mobile capture | View |
 |---|---|
+| [Landing page](desktop-landing.png) / [mobile](mobile-landing.png) | Default app entry point, with a simulated preview and links into the real workspace |
 | [Today](desktop-today.png) / [mobile](mobile-today.png) | Local follow-ups grouped by deadline |
 | [Empty Today](desktop-today-empty.png) / [mobile](mobile-today-empty.png) | Import instructions and demonstration entry point |
 | [Inbox](desktop-inbox.png) / [mobile](mobile-inbox.png) | Imported demo emails with effective labels and original prediction details |

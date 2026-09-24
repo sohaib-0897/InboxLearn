@@ -74,6 +74,21 @@ def run_browser(url, profile):
         page.on("pageerror", lambda error: errors.append(str(error)))
         page.on("request", lambda request: external.append(request.url) if not request.url.startswith(("http://127.0.0.1", "ws://127.0.0.1", "data:", "blob:")) else None)
         page.goto(url)
+        expect(page.get_by_role("heading", name="Your inbox gets smarter with every correction.", exact=True)).to_be_visible()
+        expect(page.locator("#emailList .email-item-btn")).to_have_count(3)
+        if profile == "mobile":
+            page.locator("#mobileNavToggle").click()
+            expect(page.locator("#mobileNavDrawer")).to_be_visible()
+            page.locator("#mobileNavToggle").click()
+            expect(page.locator("#mobileNavDrawer")).to_be_hidden()
+        no_overflow(page)
+        page.screenshot(path=str(OUT / f"{profile}-landing.png"), full_page=True)
+        page.locator("#emailList .email-item-btn").nth(1).click()
+        expect(page.locator("#detailSubject")).to_have_text("Rent invoice available")
+        page.locator("#btnSaveCorrection").click()
+        expect(page.locator("#consoleStatusMsg")).to_contain_text("PREVIEW ONLY")
+        page.locator(".hero-actions a", has_text="Open InboxLearn").click()
+        expect(page).to_have_url(url + "/?view=workspace")
         expect(page.get_by_role("heading", name="InboxLearn", exact=True)).to_be_visible()
         settled(page)
         assert page.locator(".np-kicker").bounding_box()["y"] >= 56
@@ -262,7 +277,7 @@ def capture_profile(profile, portfolio):
                 destination = ROOT / "docs" / "screenshots"
                 destination.mkdir(parents=True, exist_ok=True)
                 images = [f"{profile}-{name}.png" for name in (
-                    "today-empty", "today", "inbox", "review", "candidate", "prediction-changes", "evaluation", "matrices", "versions")]
+                    "landing", "today-empty", "today", "inbox", "review", "candidate", "prediction-changes", "evaluation", "matrices", "versions")]
                 for name in images:
                     shutil.copyfile(OUT / name, destination / name)
                 evidence["screenshots"] = images
@@ -281,7 +296,8 @@ def main():
     if args.portfolio:
         evidence["captured_at"] = datetime.now(timezone.utc).isoformat()
         evidence["source_sha256"] = {name: hashlib.sha256((ROOT / name).read_bytes()).hexdigest() for name in (
-            "app.py", "inboxlearn/presentation.py", "assets/newsprint.css", ".streamlit/config.toml", "scripts/browser_qa.py")}
+            "app.py", "inboxlearn/presentation.py", "inboxlearn/landing.py", "assets/newsprint.css",
+            "landing/index.html", "landing/styles.css", "landing/script.js", ".streamlit/config.toml", "scripts/browser_qa.py")}
         evidence["screenshot_sha256"] = {name: hashlib.sha256((ROOT / "docs" / "screenshots" / name).read_bytes()).hexdigest()
                                          for profile in ("desktop", "mobile") for name in evidence[profile]["screenshots"]}
         (ROOT / "docs" / "screenshots" / "capture.json").write_text(

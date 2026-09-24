@@ -24,13 +24,19 @@ def assert_clean(app):
     return app
 
 
+def workspace_app():
+    app = AppTest.from_file(str(APP), default_timeout=20)
+    app.query_params["view"] = "workspace"
+    return assert_clean(app.run())
+
+
 def click(app, label):
     next(b for b in app.button if b.label == label).click().run()
     assert_clean(app)
 
 
 def test_empty_states_and_classification_failure(workspace, monkeypatch):
-    app = assert_clean(AppTest.from_file(str(APP), default_timeout=20).run())
+    app = workspace_app()
     assert len(app.tabs) == 5
     assert app.button(key="train_model").disabled
     assert any("Not evaluated" in i.value for i in app.info)
@@ -48,7 +54,7 @@ def test_ui_workflow_and_version_specific_results(workspace, monkeypatch):
     # browser QA separately exercises the native uploader.
     payload = b'subject,body,sender\n<script>alert(1)</script>,"Review this <b>inert</b> message",test@example.test\n'
     monkeypatch.setattr("streamlit.file_uploader", lambda *a, **kw: io.BytesIO(payload))
-    app = assert_clean(AppTest.from_file(str(APP), default_timeout=20).run())
+    app = workspace_app()
     app.button(key="classify_csv").click().run()
     assert_clean(app)
     assert len(workspace.repo.inbox_rows()) == 1
@@ -113,7 +119,7 @@ def test_ui_workflow_and_version_specific_results(workspace, monkeypatch):
 
 
 def test_filters_and_confident_review(workspace):
-    app = assert_clean(AppTest.from_file(str(APP), default_timeout=20).run())
+    app = workspace_app()
     app.slider[0].set_value(0.0)
     app.slider[1].set_value(0.0).run()
     app.button(key="demo_classify").click().run()
@@ -136,7 +142,7 @@ def test_regressions_are_labelled_without_fabricating_scores():
 
 
 def test_save_next_order_exhaustion_and_history(workspace):
-    app = assert_clean(AppTest.from_file(str(APP), default_timeout=20).run())
+    app = workspace_app()
     app.button(key="demo_classify").click().run()
     app.checkbox(key="include_confident").check().run()
     expected = [r["id"] for r in workspace.review_rows(include_confident=True)]
@@ -158,7 +164,7 @@ def test_save_next_order_exhaustion_and_history(workspace):
 
 
 def test_failed_save_keeps_message_and_form(workspace, monkeypatch):
-    app = assert_clean(AppTest.from_file(str(APP), default_timeout=20).run())
+    app = workspace_app()
     app.button(key="demo_classify").click().run()
     app.checkbox(key="include_confident").check().run()
     selected = app.selectbox(key="review_email").value
@@ -176,7 +182,7 @@ def test_failed_save_keeps_message_and_form(workspace, monkeypatch):
 
 
 def test_stale_candidate_warning_and_preview_invalidation(workspace):
-    app = assert_clean(AppTest.from_file(str(APP), default_timeout=20).run())
+    app = workspace_app()
     app.button(key="demo_classify").click().run()
     app.checkbox(key="include_confident").check().run()
     click(app, "Save human correction")
@@ -207,7 +213,7 @@ def test_measured_regressions_remain_eligible_for_user_activation(workspace):
     for row in workspace.repo.inbox_rows():
         workspace.save_feedback(row["id"], "spam", "low")
     candidate = workspace.train()["version_id"]
-    app = assert_clean(AppTest.from_file(str(APP), default_timeout=20).run())
+    app = workspace_app()
     assert app.button(key=f"activate-{candidate}").disabled
     app.button(key="evaluate").click().run()
     assert_clean(app)
@@ -221,7 +227,7 @@ def test_batch_confirmation_ui(workspace):
     from inboxlearn.demo import demo_data_path
     workspace.classify_upload(demo_data_path("demo_feedback.csv").read_bytes())
     
-    app = assert_clean(AppTest.from_file(str(APP), default_timeout=20).run())
+    app = workspace_app()
     app.checkbox(key="include_confident").check().run()
     assert_clean(app)
 
@@ -251,7 +257,7 @@ def test_review_filters_ui(workspace):
     from inboxlearn.demo import demo_data_path
     workspace.classify_upload(demo_data_path("demo_feedback.csv").read_bytes())
 
-    app = assert_clean(AppTest.from_file(str(APP), default_timeout=20).run())
+    app = workspace_app()
     app.checkbox(key="include_confident").check().run()
 
     inbox = workspace.repo.inbox_rows()
@@ -285,7 +291,7 @@ def test_upload_renders_with_gmail_disabled(workspace, monkeypatch, environment)
 
     monkeypatch.setattr("inboxlearn.gmail.CredentialStore", forbidden_gmail_access)
     monkeypatch.setattr("inboxlearn.gmail.run_oauth_flow", forbidden_gmail_access)
-    app = assert_clean(AppTest.from_file(str(APP), default_timeout=20).run())
+    app = workspace_app()
     assert "Upload / Inbox" in [tab.label for tab in app.tabs]
     assert any("Gmail integration is disabled in hosted demo mode." == info.value for info in app.info)
     assert app.button(key="btn_connect_gmail").disabled
@@ -310,7 +316,7 @@ def test_file_upload_works_with_gmail_disabled(workspace, monkeypatch, filename)
     upload = io.BytesIO(payloads[filename])
     upload.name = filename
     monkeypatch.setattr("streamlit.file_uploader", lambda *args, **kwargs: upload)
-    app = assert_clean(AppTest.from_file(str(APP), default_timeout=20).run())
+    app = workspace_app()
     app.button(key="classify_csv").click().run()
     assert_clean(app)
     assert len(workspace.repo.inbox_rows()) == 1
@@ -322,7 +328,7 @@ def test_gmail_controls_follow_hosted_setting_on_rerun(workspace, monkeypatch):
     monkeypatch.delenv("INBOXLEARN_HOSTED", raising=False)
     monkeypatch.delenv("STREAMLIT_SERVER_IS_RUNNING", raising=False)
     monkeypatch.setattr("inboxlearn.gmail.CredentialStore.load_tokens", lambda self: None)
-    app = assert_clean(AppTest.from_file(str(APP), default_timeout=20).run())
+    app = workspace_app()
     assert any("CONNECT GMAIL" in markdown.value for markdown in app.markdown)
     monkeypatch.setenv("INBOXLEARN_HOSTED", "1")
     assert_clean(app.run())
@@ -398,14 +404,14 @@ def test_action_journal_service_and_ui_flow(workspace):
     assert actions[0]["status"] == "reverted"
 
     # 4. Verify UI renders without errors when action journal is populated
-    app = assert_clean(AppTest.from_file(str(APP), default_timeout=20).run())
+    app = workspace_app()
     assert any("Action journal" in e.label for e in app.expander)
 
 
 def test_inbox_table_source_and_date_columns(workspace):
     from inboxlearn.demo import demo_data_path
     workspace.classify_upload(demo_data_path("demo_feedback.csv").read_bytes())
-    app = assert_clean(AppTest.from_file(str(APP), default_timeout=20).run())
+    app = workspace_app()
     df = next(d.value for d in app.dataframe if "Subject" in d.value.columns)
     assert "Source" in df.columns
     assert "Date" in df.columns
@@ -415,7 +421,7 @@ def test_inbox_table_source_and_date_columns(workspace):
 
 def test_daily_navigation_due_date_and_reopen(workspace):
     from datetime import date
-    app = assert_clean(AppTest.from_file(str(APP), default_timeout=20).run())
+    app = workspace_app()
     assert app.session_state['workspace_tabs'] == 'Today'
     app.button(key='today_demo').click().run()
     mid = workspace.review_rows(include_confident=True)[0]['id']
@@ -440,7 +446,7 @@ def test_save_next_respects_all_filters(workspace):
     with workspace.repo.training_transaction() as conn:
         conn.execute("UPDATE predictions SET category='bills', priority='high', status='needs_review'")
         conn.execute("UPDATE emails SET import_batch=CASE WHEN id IN (1,2) THEN 'selected' ELSE 'other' END")
-    app = assert_clean(AppTest.from_file(str(APP), default_timeout=20).run())
+    app = workspace_app()
     app.selectbox(key='review_cat_filter').select('bills').run()
     app.selectbox(key='review_pri_filter').select('high').run()
     app.selectbox(key='review_batch_filter').select('selected').run()
@@ -456,7 +462,7 @@ def test_save_next_respects_all_filters(workspace):
 def test_stale_batch_requires_refresh(workspace):
     from inboxlearn.demo import demo_data_path
     workspace.classify_upload(demo_data_path('demo_feedback.csv').read_bytes())
-    app = assert_clean(AppTest.from_file(str(APP), default_timeout=20).run())
+    app = workspace_app()
     app.checkbox(key='include_confident').check().run()
     app.multiselect(key='batch_confirm_selection').select(1).select(2).run()
     workspace.save_feedback(1, 'spam', 'high')

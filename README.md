@@ -77,7 +77,9 @@ macOS / Linux:
 .venv/bin/python -m streamlit run app.py
 ```
 
-Open **http://localhost:8501**. Use **Classify demonstration sample**, then confirm labels in **Review queue**; the supplied [feedback CSV](data/demo_feedback.csv) contains reference labels. Prepare a candidate in **Train / Versions**, inspect prediction changes and evaluate it in **Evaluation**, then return to activate or roll back.
+Open **http://localhost:8501** to see the landing page, then choose **Open InboxLearn** to enter the workspace. The same navigation works at the hosted Streamlit URL; append `?view=workspace` for a direct workspace link. **Back to landing page** is available in the workspace sidebar. The landing page's interactive preview is a simulation and does not save feedback or train models.
+
+In the workspace, use **Classify demonstration sample**, then confirm labels in **Review queue**; the supplied [feedback CSV](data/demo_feedback.csv) contains reference labels. Prepare a candidate in **Train / Versions**, inspect prediction changes and evaluate it in **Evaluation**, then return to activate or roll back.
 
 Uploads require UTF-8 CSV with `subject` and `body`; `sender` is optional. Data stays in `runtime/inboxlearn.sqlite3`, which is excluded from Git. The app binds to localhost and disables Streamlit usage telemetry. [Configuration, CSV rules and detailed walkthrough](docs/PROJECT_GUIDE.md)
 

@@ -18,6 +18,7 @@ from inboxlearn.calendar_export import (
 )
 from inboxlearn.demo import demo_data_path, load_demo_rows
 from inboxlearn.entities import ExtractedEntity
+from inboxlearn.landing import render_landing
 from inboxlearn.service import InboxLearnService
 from inboxlearn.presentation import (
     apply_newsprint, masthead, status_strip, section, show_email,
@@ -26,7 +27,7 @@ from inboxlearn.presentation import (
 
 st.set_page_config(page_title="InboxLearn", page_icon="✉", layout="wide", initial_sidebar_state="collapsed")
 
-APP_VERSION = "2.3.3"
+APP_VERSION = "2.4.0"
 
 
 def _safe_review_rows(service: InboxLearnService, **kwargs) -> list[dict]:
@@ -769,9 +770,15 @@ def render_prediction_changes(service, versions) -> None:
 
 
 def main() -> None:
+    if st.query_params.get("view") != "workspace":
+        render_landing()
+        return
     apply_newsprint()
     settings = Settings.from_environment()
     with st.sidebar:
+        if st.button("Back to landing page", key="back_to_landing"):
+            st.query_params["view"] = "landing"
+            st.rerun()
         st.header("Routing controls")
         st.caption("Applies to future imports. Existing routing records stay as originally classified.")
         category_threshold = st.slider("Category review threshold", 0.0, 1.0, min(1.0, max(0.0, settings.category_threshold)), 0.01)

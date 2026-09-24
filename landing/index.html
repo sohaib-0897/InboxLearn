@@ -24,7 +24,7 @@
       <div>
         <span>EDITION: LOCAL RUNTIME</span> · 
         <span>ARCHITECTURE: PYTHON 3.12 / SCIKIT-LEARN / SQLITE</span> · 
-        <span>RELEASE: v2.3.0</span>
+        <span>RELEASE: v2.4.0</span>
       </div>
       <div>
         <span>STATUS: ZERO EXTERNAL APIS REQUIRED</span> · 
@@ -61,11 +61,7 @@
         
         <!-- Mobile Navigation Toggle -->
         <button type="button" class="mobile-nav-toggle" id="mobileNavToggle" aria-label="Toggle navigation menu" aria-expanded="false">
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="square" aria-hidden="true">
-            <line x1="3" y1="6" x2="21" y2="6"></line>
-            <line x1="3" y1="12" x2="21" y2="12"></line>
-            <line x1="3" y1="18" x2="21" y2="18"></line>
-          </svg>
+          <span aria-hidden="true" style="font-size:24px;line-height:1;">☰</span>
         </button>
       </div>
     </div>
@@ -113,7 +109,7 @@
               InboxLearn combines fast <strong>machine learning classification</strong> with rigorous <strong>human review</strong>. Instead of trusting a black-box model or relying on fragile static filters, operators inspect uncertain predictions, correct classifications, and train immutable candidate models—guarded by held-out evaluation before any weights go live.
             </p>
             <p style="font-size: 1.05rem; color: var(--np-secondary); line-height: 1.6;">
-              Engineered for engineers, students, and professionals handling job applications, billing invoices, coursework, and high-volume communication without shipping private correspondence to external cloud vendors.
+              Engineered for engineers, students, and professionals handling job applications, billing invoices, coursework, and high-volume communication, with a local deployment option that keeps private correspondence on your own machine.
             </p>
 
             <!-- Hero CTAs -->
@@ -177,7 +173,7 @@
             <h2 id="preview-heading">Realistic Inbox Triage Interface</h2>
           </div>
           <p class="section-lead-text">
-            Experience the actual InboxLearn workflow below. Examine uncalibrated model estimates, uncertain predictions flagged for review, and inspect the human correction controls.
+            Explore a browser-only simulation using synthetic messages and illustrative predictions. Nothing here is saved or trained. Open InboxLearn to use the real workspace.
           </p>
         </div>
 
@@ -187,13 +183,13 @@
           <div class="console-topbar">
             <div>
               <span class="live-dot" aria-hidden="true"></span>
-              <strong>ACTIVE WORKSPACE:</strong> Local Mailbox (3 demonstration messages loaded)
+              <strong>INTERACTIVE PREVIEW:</strong> 3 synthetic messages (not saved)
             </div>
             <div>
               <strong>MODEL LINEAGE:</strong> <span id="statModelVersion">v1.0.4-active (Seed baseline)</span>
             </div>
             <div>
-              <strong>FEEDBACK COMMITS:</strong> <span id="ledgerCounter" style="color:#00FF66; font-weight:bold;">0</span> confirmed
+              <strong>SIMULATED CORRECTIONS:</strong> <span id="ledgerCounter" style="color:#00FF66; font-weight:bold;">0</span> previewed
             </div>
           </div>
 
@@ -297,7 +293,7 @@ Talent Acquisition Team
 
                     <div style="padding-top: 6px;">
                       <button type="button" class="btn btn-primary" id="btnSaveCorrection" style="width: 100%;">
-                        <span>Save & Next (Commit Feedback)</span>
+                        <span>Simulate correction & Next</span>
                         <span aria-hidden="true">↵</span>
                       </button>
                     </div>
@@ -308,7 +304,7 @@ Talent Acquisition Team
               <!-- Console Bottom Operational Ledger Status -->
               <div class="console-footer-status">
                 <div id="consoleStatusMsg">
-                  Click an email on the left or commit a correction above to see how SQLite persists feedback without altering the live model.
+                  Select a synthetic email or simulate a correction. This preview does not write to SQLite or change a model.
                 </div>
                 <div class="np-mono" style="color:var(--np-secondary);">
                   Gated Activation Enforced

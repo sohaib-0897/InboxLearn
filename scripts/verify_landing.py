@@ -40,7 +40,7 @@ async def run_verification():
         await page.click("#btnSaveCorrection")
         await page.wait_for_timeout(300)
         status_msg = await page.inner_text("#consoleStatusMsg")
-        assert "PERSISTED TO SQLITE" in status_msg, f"Correction feedback missing: {status_msg}"
+        assert "PREVIEW ONLY" in status_msg, f"Simulation feedback missing: {status_msg}"
         
         # 2. Tablet Check (768x1024)
         page_tablet = await browser.new_page(viewport={"width": 768, "height": 1024})

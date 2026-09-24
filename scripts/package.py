@@ -22,9 +22,10 @@ def main():
                                      ".streamlit/config.toml", "reports/learning.json", "reports/learning.md",
                                      "docs/screenshots/README.md", "docs/screenshots/capture.json"]]
     files.extend(ROOT / "data" / f"demo_{name}.csv" for name in ("seed", "feedback", "validation", "eval"))
+    files.extend(ROOT / "landing" / name for name in ("index.html", "styles.css", "script.js"))
     files.extend(ROOT / "docs" / "screenshots" / f"{profile}-{name}.png"
                  for profile in ("desktop", "mobile")
-                 for name in ("today-empty", "today", "inbox", "review", "candidate", "prediction-changes", "evaluation", "matrices", "versions"))
+                 for name in ("landing", "today-empty", "today", "inbox", "review", "candidate", "prediction-changes", "evaluation", "matrices", "versions"))
     for folder, pattern in [("inboxlearn", "*.py"), ("tests", "*.py"), ("scripts", "*.py"), ("assets", "*.css"), ("data", "*.md")]:
         files.extend(sorted((ROOT / folder).glob(pattern)))
     archive_path = ROOT / "InboxLearn.zip"
