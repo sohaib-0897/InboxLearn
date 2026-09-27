@@ -20,8 +20,9 @@ def main():
     files = [ROOT / name for name in ["app.py", "README.md", "PORTFOLIO.md", "requirements.txt", "constraints-verified.txt",
                                      ".gitignore", ".gitattributes", ".github/workflows/ci.yml", "docs/PROJECT_GUIDE.md",
                                      ".streamlit/config.toml", "reports/learning.json", "reports/learning.md",
+                                     "reports/expanded_evaluation.json", "reports/expanded_evaluation.md",
                                      "docs/screenshots/README.md", "docs/screenshots/capture.json"]]
-    files.extend(ROOT / "data" / f"demo_{name}.csv" for name in ("seed", "feedback", "validation", "eval"))
+    files.extend(ROOT / "data" / f"demo_{name}.csv" for name in ("seed", "feedback", "validation", "eval", "eval_expanded"))
     files.extend(ROOT / "landing" / name for name in ("index.html", "styles.css", "script.js"))
     files.extend(ROOT / "docs" / "screenshots" / f"{profile}-{name}.png"
                  for profile in ("desktop", "mobile")

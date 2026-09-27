@@ -1,0 +1,26 @@
+subject,body,sender,category,priority
+"Interview schedule confirmation","Your technical interview for the senior systems engineer position has been confirmed for Friday morning.",eval-jobs@example.test,job opportunities,high
+"Application status update","Thank you for submitting your engineering application; our team is reviewing your qualifications.",eval-careers@example.test,job opportunities,normal
+"Monthly engineering alumni career digest","A periodic summary of open positions, resume workshops, and industry networking sessions.",eval-network@example.test,job opportunities,low
+"Graduate research fellowship information","The department invites candidates to an informational meeting regarding fully funded graduate research positions.",eval-fellows@example.test,job opportunities,normal
+"Campus job opening in computing laboratory","The campus computing laboratory is seeking an undergraduate student administrator for 10 hours weekly.",eval-studentwork@example.test,job opportunities,low
+"Tuition payment deadline notice","Notice of immediate deadline: pending tuition balance must be settled before course enrollment closes.",eval-bursar@example.test,university,high
+"Midterm examination room assignments","The registrar has finalized classroom locations and seating allocations for next week's midterm examinations.",eval-registrar@example.test,university,high
+"Faculty office hours schedule changes","Please review the revised office hours and discussion sections for machine learning course CS 402.",eval-faculty@example.test,university,normal
+"Campus library book recall request","A book currently checked out to your student account has been recalled by another borrower.",eval-library@example.test,university,normal
+"Annual university foundation gala invitation","Alumni and friends are invited to register for the annual campus foundation scholarship dinner.",eval-alumni@example.test,university,low
+"Urgent electric utility disconnection notice","Immediate action required: electrical service will be suspended unless overdue payment is received within 48 hours.",eval-power@example.test,bills,high
+"Monthly fiber internet statement ready","Your electronic bill for broadband internet service is ready for review in the customer account center.",eval-broadband@example.test,bills,normal
+"Municipal water and sewer quarterly invoice","Your quarterly municipal water meter reading and associated utility charges have been finalized.",eval-water@example.test,bills,normal
+"Zero dollar medical claim explanation of benefits","This statement summarizes recent health insurance claims where your patient responsibility is zero dollars.",eval-health@example.test,bills,low
+"Mobile service invoice and optional hardware upgrade","Your monthly wireless account statement is available; see page two for promotional upgrade incentives.",eval-wireless@example.test,bills,normal
+"Flash sale ends at midnight: 60 percent discount","Save 60 percent on mechanical keyboards and noise cancelling headsets during our flash promotion.",eval-deals@example.test,promotions,high
+"Early bird registration for autumn software summit","Register before the early deadline to receive thirty percent off developer conference tickets.",eval-events@example.test,promotions,normal
+"Weekend department store catalogue announcement","Browse our new inventory of ergonomic furniture and desk accessories in this weekend edition.",eval-retail@example.test,promotions,low
+"Seasonal subscription discount for cloud backup","Renew your automated cloud backup service today to lock in a twenty percent annual discount.",eval-storage@example.test,promotions,normal
+"Job search resume optimization voucher inside","Special member offer: receive a promotional voucher for certified technical resume review services.",eval-offers@example.test,promotions,low
+"Critical security alert: unauthorized login detected","A login from an unknown device occurred; verify your banking security code immediately or your account will be frozen.",eval-security@example.test,spam,high
+"Unclaimed wire transfer awaiting your bank details","Our escrow office holds four million dollars in unsettled foreign inheritance funds awaiting transfer authorization.",eval-funds@example.test,spam,high
+"Guaranteed algorithmic investment returns program","Double your retirement savings with our proprietary automated stock prediction algorithm.",eval-invest@example.test,spam,normal
+"Commercial vendor directory database download","Purchase our verified contact list containing two hundred thousand enterprise procurement directors.",eval-b2b@example.test,spam,low
+"Urgent unpaid contractor fee from unknown vendor","Review the attached overdue contractor invoice of 3500 dollars or legal proceedings will commence.",eval-fakeinvoice@example.test,spam,high

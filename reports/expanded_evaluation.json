@@ -1,0 +1,91 @@
+{
+  "dataset": "data/demo_eval_expanded.csv",
+  "rows": 25,
+  "disclaimer": "Synthetic evaluation data only; not a real-world accuracy claim. Confidence estimates are uncalibrated.",
+  "category_distribution": {
+    "job opportunities": 5,
+    "university": 5,
+    "bills": 5,
+    "promotions": 5,
+    "spam": 5
+  },
+  "priority_distribution": {
+    "high": 8,
+    "normal": 10,
+    "low": 7
+  },
+  "overall": {
+    "baseline_v1": {
+      "category_accuracy": 0.32,
+      "category_macro_f1": 0.255026455026455,
+      "priority_accuracy": 0.36,
+      "priority_macro_f1": 0.27777777777777773
+    },
+    "candidate_v2": {
+      "category_accuracy": 0.76,
+      "category_macro_f1": 0.7427705627705629,
+      "priority_accuracy": 0.32,
+      "priority_macro_f1": 0.2246117084826762
+    },
+    "absolute_changes": {
+      "category_accuracy": 0.44,
+      "category_macro_f1": 0.48774410774410787,
+      "priority_accuracy": -0.03999999999999998,
+      "priority_macro_f1": -0.05316606929510154
+    }
+  },
+  "per_class": {
+    "category": {
+      "job opportunities": {
+        "support": 5,
+        "v1_f1": 0.0,
+        "v2_f1": 0.5714285714285714,
+        "delta_f1": 0.5714285714285714
+      },
+      "university": {
+        "support": 5,
+        "v1_f1": 0.0,
+        "v2_f1": 0.8,
+        "delta_f1": 0.8
+      },
+      "bills": {
+        "support": 5,
+        "v1_f1": 0.5714285714285714,
+        "v2_f1": 0.8333333333333334,
+        "delta_f1": 0.261904761904762
+      },
+      "promotions": {
+        "support": 5,
+        "v1_f1": 0.3333333333333333,
+        "v2_f1": 0.9090909090909091,
+        "delta_f1": 0.5757575757575757
+      },
+      "spam": {
+        "support": 5,
+        "v1_f1": 0.37037037037037035,
+        "v2_f1": 0.6,
+        "delta_f1": 0.22962962962962963
+      }
+    },
+    "priority": {
+      "low": {
+        "support": 7,
+        "v1_f1": 0.5,
+        "v2_f1": 0.2222222222222222,
+        "delta_f1": -0.2777777777777778
+      },
+      "normal": {
+        "support": 10,
+        "v1_f1": 0.0,
+        "v2_f1": 0.0,
+        "delta_f1": 0.0
+      },
+      "high": {
+        "support": 8,
+        "v1_f1": 0.3333333333333333,
+        "v2_f1": 0.45161290322580644,
+        "delta_f1": 0.11827956989247312
+      }
+    }
+  }
+}

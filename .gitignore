@@ -26,3 +26,4 @@ InboxLearn.zip.tmp
 !data/demo_feedback.csv
 !data/demo_validation.csv
 !data/demo_eval.csv
+!data/demo_eval_expanded.csv

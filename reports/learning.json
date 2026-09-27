@@ -637,7 +637,7 @@
     "probes": 15
   },
   "source_sha256": {
-    "inboxlearn/classifier.py": "f28b9453df8ef24804d04bd31d1ecf3e678c2dfe31c4b1f4b091328b6f7fab60",
+    "inboxlearn/classifier.py": "622fa346576711a468378edd0972335f89ee8275a54c0417e263424ddbdc305c",
     "inboxlearn/config.py": "08ef3c7c9c555e3385b18ddb9d717c04e8be80df034fead092f1424ce705635d",
     "inboxlearn/db.py": "fe6461a0962224b99217f0f3b63bf0c218dc959f9c4e5a56fe352ba4acb75481",
     "inboxlearn/evaluation.py": "50d07573bccd9b3a8c9b82906ebd361e5be8f072de2972ead28b599fbffd32de",
