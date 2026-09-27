@@ -6,7 +6,7 @@ InboxLearn is a small local Streamlit app and self learning AI agent for human-i
 
 The agent predicts five categories (`job opportunities`, `university`, `bills`, `promotions`, `spam`) and three priorities (`low`, `normal`, `high`). It stores the original prediction, uncalibrated confidence estimates, model version, corrections, training lineage, and evaluation results in SQLite. A prediction enters review when either confidence estimate is below its configurable threshold. Suggested next actions are informational only.
 
-[Measured experiment](../reports/learning.md) · [Full results](../reports/learning.json) · [Portfolio / CV bullets](../PORTFOLIO.md) · [Real screenshots](screenshots/README.md)
+[Measured experiment](../reports/learning.md) · [Full results](../reports/learning.json) · [Real screenshots](screenshots/README.md)
 
 ## Reproduce the learning experiment
 
