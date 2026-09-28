@@ -34,9 +34,12 @@ jobs:
           cache: pip
           cache-dependency-path: |
             requirements.txt
+            requirements-test.txt
             constraints-verified.txt
       - name: Install verified dependency versions
         run: python -m pip install -r requirements.txt -c constraints-verified.txt
+      - name: Install test dependencies
+        run: python -m pip install -r requirements-test.txt -c constraints-verified.txt
       - name: Check dependencies
         run: python -m pip check
       - name: Run service, model, experiment and UI tests

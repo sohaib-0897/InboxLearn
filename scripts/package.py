@@ -17,7 +17,7 @@ def main():
               **{f"docs/screenshots/{name}": digest for name, digest in capture["screenshot_sha256"].items()}}
     for name, expected in hashes.items():
         assert hashlib.sha256((ROOT / name).read_bytes()).hexdigest() == expected, f"Stale evidence: {name}"
-    files = [ROOT / name for name in ["app.py", "README.md", "PORTFOLIO.md", "requirements.txt", "constraints-verified.txt",
+    files = [ROOT / name for name in ["app.py", "README.md", "PORTFOLIO.md", "requirements.txt", "requirements-test.txt", "constraints-verified.txt",
                                      ".gitignore", ".gitattributes", ".github/workflows/ci.yml", "docs/PROJECT_GUIDE.md",
                                      ".streamlit/config.toml", "reports/learning.json", "reports/learning.md",
                                      "reports/expanded_evaluation.json", "reports/expanded_evaluation.md",
