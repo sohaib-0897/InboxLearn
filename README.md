@@ -6,9 +6,36 @@ A local, human-in-the-loop email triage system featuring incremental linear clas
 
 Production text classifiers inevitably degrade under concept drift and edge-case errors. InboxLearn addresses the engineering lifecycle surrounding those errors: confidence-routed human triage, isolated candidate model training from feedback, side-by-side inbox prediction diffing, and strict evaluation gating before any candidate model can be activated. It runs entirely on local hardware using Python, scikit-learn, SQLite, and Streamlit, with zero external API dependencies and strictly read-only intake.
 
-## Demo / Screenshots
+## Portfolio & Agency UI Showcase
 
-The following captures are unedited desktop screenshots from the running Streamlit application using the repository's synthetic demonstration fixtures:
+The repository includes a modern portfolio-grade web client in `frontend/` inspired by the craftsmanship, depth, motion, and visual standards of **basement.studio** and **shadergradient.co**. It communicates directly with the high-performance local FastAPI backend to drive real-time model inference, human triage, pre-activation prediction diffing, evaluation gating, and bit-exact rollback.
+
+<p align="center">
+  <img src="docs/screenshots/agency/desktop-01-hero.png" width="100%" alt="InboxLearn Hero with Three.js WebGL Shader and 3D Spring Model Card" />
+</p>
+
+<p align="center">
+  <img src="docs/screenshots/agency/desktop-02-inference-aws.png" width="49%" alt="Real-time Inference Studio with probability distributions and latency metrics" />
+  <img src="docs/screenshots/agency/desktop-05-candidate-gate.png" width="49%" alt="Pre-activation diffing and held-out evaluation gate" />
+</p>
+<p align="center">
+  <img src="docs/screenshots/agency/desktop-04-review-desk.png" width="49%" alt="Human review desk with confidence routing and feedback submission" />
+  <img src="docs/screenshots/agency/desktop-06-version-ledger.png" width="49%" alt="Immutable model version ledger with one-click rollback" />
+</p>
+
+*Top: WebGL fluid probability manifold hero with interactive 3D physics-based model architecture tensor card (React Spring) and live telemetry. Middle left: Real-time inference probe with uncalibrated log-loss probability distributions, 4,096-dim stateless feature projection, and entity extraction. Middle right: Candidate model preparation with pre-activation prediction diffing (highlighting training-set membership) and held-out evaluation gating. Bottom left: Human triage desk with confidence threshold routing. Bottom right: Immutable snapshot version ledger with safe IBL1 serialization and bit-exact rollback.*
+
+### Motion Architecture & Stack
+- **Three.js & WebGL Shaders**: Purpose-built continuous probability manifold canvas reacting smoothly to cursor movement and time, equipped with graceful static fallback for reduced-motion and non-WebGL environments.
+- **GSAP + ScrollTrigger**: Hero entrance choreography and scrub-able section transitions across the 6-stage continuous learning lifecycle.
+- **Lenis**: Buttery smooth scrolling synchronized with ScrollTrigger ticks, respecting `prefers-reduced-motion`.
+- **Motion for React (`motion`)**: Fluid UI state transitions, tab navigation with morphing active pills, dialogs, drawers, and feedback submission notifications.
+- **React Spring (`@react-spring/web`)**: 3D physics-driven interactive tensor card with realistic mass, tension, and damping on pointer tilt and drag.
+- **Anime.js**: Micro-interaction metric count-ups (inference latency in ms, feature dimension expansion, and accuracy deltas).
+
+## Editorial Streamlit Interface
+
+In addition to the modern web frontend, the native Newsprint Streamlit application remains fully functional:
 
 <p align="center">
   <img src="docs/screenshots/desktop-prediction-changes.png" width="49%" alt="Prediction diff comparing active baseline v1 and candidate v2" />
@@ -158,23 +185,41 @@ To evaluate boundary behavior across broader scenario families, [`data/demo_eval
 3. **Install verified dependencies:**
    ```bash
    pip install -r requirements.txt -c constraints-verified.txt
+   pip install fastapi uvicorn httpx python-multipart
    ```
 
-4. **Launch the Streamlit workspace:**
+4. **Launch Options:**
+
+   #### Option A: Unified Agency Portfolio Website (FastAPI + Built SPA)
+   Run the production API server (serves the REST API and the compiled React + Three.js application simultaneously at `http://127.0.0.1:8000`):
+   ```bash
+   python scripts/serve_api.py 8000
+   ```
+   Open **http://127.0.0.1:8000** in your browser. API docs are available at **http://127.0.0.1:8000/docs**.
+
+   #### Option B: Frontend Hot-Reload Development (Vite + React)
+   In a separate terminal, install npm dependencies and launch the Vite development server:
+   ```bash
+   cd frontend
+   npm install
+   npm run dev
+   ```
+   Open **http://localhost:5173** in your browser. The Vite server automatically proxies `/api/*` to the FastAPI backend at port 8000.
+
+   #### Option C: Native Newsprint Streamlit Workspace
    ```bash
    streamlit run app.py
    ```
-
-Open **http://localhost:8501** in your browser. Select **Open InboxLearn** to access the workspace, or navigate directly to **http://localhost:8501/?view=workspace**.
+   Open **http://localhost:8501** in your browser. Select **Open InboxLearn** to access the workspace, or navigate directly to **http://localhost:8501/?view=workspace**.
 
 ### Demonstration Walkthrough
-1. Go to **Upload / Inbox** and click **Classify demonstration sample** (imports 5 synthetic emails).
-2. Go to **Review queue**, inspect low-confidence messages, adjust category/priority, and click **Save and next**.
-3. Go to **Train / Versions** and click **Prepare candidate** (creates inactive model `v2` using safe `IBL1` serialization).
-4. Go to **Evaluation**, select `v2`, and click **Compute prediction changes** to inspect inbox diffs.
-5. Click **Evaluate comparison** to run held-out verification against `data/demo_eval.csv`.
-6. Return to **Train / Versions** and click **Activate v2**.
-7. Test rollback by clicking **Roll back to v1** and observe immediate restoration of the baseline state.
+1. Go to **Upload / Inbox** or **Review Desk** and click **Load Demo Fixture (5 Emails)**.
+2. Inspect low-confidence messages, adjust category/priority, and click **Save Feedback**.
+3. Go to **Candidate & Gate** and click **Prepare Candidate Snapshot** (creates inactive model `v2` using safe `IBL1` serialization).
+4. Click **Diff Inbox Predictions** to inspect side-by-side changes (with training-set membership markers).
+5. Click **Run Held-Out Eval** to verify metrics against `demo_eval.csv`.
+6. Click **Activate v2 to Production** (unlocked only after evaluation succeeds!).
+7. Go to **Version Ledger**, click **Roll Back to v1**, and observe instantaneous bit-exact restoration of the baseline state.
 
 ## Testing
 

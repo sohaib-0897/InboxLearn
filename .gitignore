@@ -20,6 +20,8 @@ htmlcov/
 Thumbs.db
 InboxLearn.zip
 InboxLearn.zip.tmp
+node_modules/
+frontend/dist/
 # Only deliberately shipped synthetic CSVs should be committed.
 *.csv
 !data/demo_seed.csv
