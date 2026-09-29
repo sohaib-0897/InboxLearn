@@ -1,20 +1,19 @@
 import React, { useState } from 'react';
-import { motion, AnimatePresence } from 'motion/react';
 import { 
   Play, 
   RotateCcw, 
-  Sliders, 
-  Sparkles, 
-  AlertCircle, 
-  CheckCircle2, 
-  Calendar, 
   Tag, 
-  Zap, 
-  Layers, 
-  ExternalLink 
+  Calendar, 
+  DollarSign, 
+  CheckCircle2, 
+  AlertCircle, 
+  ExternalLink,
+  Cpu,
+  Layers,
+  Sparkles,
+  Download
 } from 'lucide-react';
 import { api, PredictResponse, ExtractedEntity } from '../api/client';
-import { MetricCounter } from './MetricCounter';
 
 const PRESETS = [
   {
@@ -54,440 +53,396 @@ const PRESETS = [
   },
 ];
 
-const CATEGORY_COLORS: Record<string, string> = {
-  'job opportunities': 'bg-indigo-500',
-  'university': 'bg-cyan-500',
-  'bills': 'bg-amber-500',
-  'promotions': 'bg-pink-500',
-  'spam': 'bg-rose-500',
-};
-
-const PRIORITY_COLORS: Record<string, string> = {
-  'high': 'bg-rose-500',
-  'normal': 'bg-amber-500',
-  'low': 'bg-emerald-500',
-};
-
 export const InferenceStudio: React.FC = () => {
   const [subject, setSubject] = useState(PRESETS[0].subject);
   const [sender, setSender] = useState(PRESETS[0].sender);
   const [body, setBody] = useState(PRESETS[0].body);
+  const [categoryThreshold, setCategoryThreshold] = useState(0.70);
+  const [priorityThreshold, setPriorityThreshold] = useState(0.70);
 
-  const [categoryThreshold, setCategoryThreshold] = useState(0.65);
-  const [priorityThreshold, setPriorityThreshold] = useState(0.60);
-
-  const [isLoading, setIsLoading] = useState(false);
+  const [isRunning, setIsRunning] = useState(false);
   const [result, setResult] = useState<PredictResponse | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [errorNotice, setErrorNotice] = useState<string | null>(null);
 
-  const runInference = async (customSub?: string, customSend?: string, customBody?: string) => {
-    setIsLoading(true);
-    setError(null);
+  const handleRunInference = async () => {
+    if (!subject.trim() && !body.trim()) return;
+    setIsRunning(true);
+    setErrorNotice(null);
     try {
-      const resp = await api.predict({
-        subject: customSub !== undefined ? customSub : subject,
-        sender: customSend !== undefined ? customSend : sender,
-        body: customBody !== undefined ? customBody : body,
+      const res = await api.predict({
+        subject,
+        sender,
+        body,
         category_threshold: categoryThreshold,
         priority_threshold: priorityThreshold,
       });
-      setResult(resp);
+      setResult(res);
     } catch (err: any) {
-      setError(err.message || 'Inference execution failed');
+      console.error('Inference probe failed', err);
+      setErrorNotice(err.message || 'Inference probe failed');
     } finally {
-      setIsLoading(false);
+      setIsRunning(false);
     }
   };
 
-  const applyPreset = (preset: typeof PRESETS[0]) => {
+  const handleLoadPreset = (preset: typeof PRESETS[0]) => {
     setSubject(preset.subject);
     setSender(preset.sender);
     setBody(preset.body);
-    runInference(preset.subject, preset.sender, preset.body);
   };
 
-  const resetForm = () => {
-    setSubject('');
-    setSender('');
-    setBody('');
-    setResult(null);
-    setError(null);
+  const handleDownloadIcs = () => {
+    if (!result?.extracted_entities) return;
+    const dateEntity = result.extracted_entities.find((e) => e.type === 'date');
+    if (!dateEntity) return;
+
+    const icsContent = [
+      'BEGIN:VCALENDAR',
+      'VERSION:2.0',
+      'PRODID:-//InboxLearn//Triage Calendar Event//EN',
+      'BEGIN:VEVENT',
+      `SUMMARY:${subject}`,
+      `DESCRIPTION:${body.slice(0, 100)}...`,
+      `DTSTART;VALUE=DATE:${dateEntity.value.replace(/-/g, '')}`,
+      'END:VEVENT',
+      'END:VCALENDAR',
+    ].join('\r\n');
+
+    const blob = new Blob([icsContent], { type: 'text/calendar;charset=utf-8' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = 'inboxlearn_event.ics';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
 
   return (
-    <div className="space-y-8 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      {/* Studio Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-white/10 pb-6">
+    <div className="space-y-6 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+      
+      {/* Header */}
+      <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 pb-4 border-b border-paper-border">
         <div>
-          <div className="flex items-center gap-2 mb-2">
-            <span className="w-2 h-2 rounded-full bg-brand-indigo animate-pulse" />
-            <span className="font-mono text-xs text-brand-indigo uppercase tracking-wider">
-              REAL-TIME PROBE BENCH
+          <div className="flex items-center gap-2 mb-1">
+            <span className="font-mono text-[10px] tracking-wider uppercase text-rust font-semibold">
+              03 INFERENCE PROBE BENCH
+            </span>
+            <span className="text-paper-border">·</span>
+            <span className="font-mono text-[10px] text-ink-muted">
+              4,096-DIM STATELESS FEATURE PROJECTION
             </span>
           </div>
-          <h2 className="text-2xl sm:text-3xl font-bold text-white tracking-tight">
-            Inference & Decision Studio
+          <h2 className="font-serif text-2xl sm:text-3xl font-bold text-ink">
+            Interactive Model Inference Probe
           </h2>
-          <p className="text-sm text-zinc-400 mt-1">
-            Probe the active SGDClassifier bundle directly across the 4,096-dim stateless feature space.
+          <p className="text-xs text-ink-muted mt-1 max-w-2xl leading-relaxed">
+            Test the active classifier bundle on arbitrary email text. Inspect uncalibrated log-loss probability distributions, stateless hashing projection, and regex entity extraction.
           </p>
         </div>
 
-        {/* Presets */}
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="text-xs text-zinc-500 font-mono mr-1">Presets:</span>
+        <div className="font-mono text-xs text-ink-muted bg-paper-sheet border border-paper-border px-3 py-2 shadow-paper-sm">
+          <span>Vector: HashingVectorizer(n=4096, 1-2 ngrams)</span>
+        </div>
+      </div>
+
+      {/* Preset Buttons Strip */}
+      <div className="space-y-1.5">
+        <span className="text-[10px] font-mono uppercase text-ink-faint block">
+          Curated Scenario Presets:
+        </span>
+        <div className="flex flex-wrap gap-2">
           {PRESETS.map((p) => (
             <button
               key={p.name}
-              onClick={() => applyPreset(p)}
-              className="text-xs px-3 py-1.5 rounded-lg bg-surface-subtle border border-white/5 text-zinc-300 hover:text-white hover:border-brand-indigo/50 hover:bg-brand-indigo/10 transition-all font-mono"
+              onClick={() => handleLoadPreset(p)}
+              className="px-2.5 py-1.5 bg-paper-sheet hover:bg-paper-subtle border border-paper-border text-xs text-ink transition-colors cursor-pointer shadow-paper-sm text-left"
             >
-              {p.name}
+              <strong className="block text-ink">{p.name}</strong>
+              <span className="text-[10px] font-mono text-ink-muted">{p.expected}</span>
             </button>
           ))}
         </div>
       </div>
 
-      {/* Main Grid: Input Column & Live Metrics Output Column */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-        {/* Left Column: Email Input & Threshold Controls (7 cols) */}
-        <div className="lg:col-span-7 space-y-6">
-          <div className="rounded-2xl bg-surface/80 border border-white/10 p-6 backdrop-blur-xl shadow-tactile space-y-5">
-            <div className="flex items-center justify-between border-b border-white/5 pb-3">
-              <span className="font-mono text-xs text-zinc-400 font-semibold tracking-wider flex items-center gap-2">
-                <Layers className="w-4 h-4 text-brand-indigo" />
-                INPUT MESSAGE PAYLOAD
-              </span>
-              <button
-                onClick={resetForm}
-                className="text-xs text-zinc-500 hover:text-zinc-300 flex items-center gap-1 font-mono transition-colors"
-                title="Reset input fields"
-              >
-                <RotateCcw className="w-3.5 h-3.5" /> Clear
-              </button>
-            </div>
+      {errorNotice && (
+        <div className="p-3 bg-rose-50 border border-rose-300 text-xs text-rose-900">
+          {errorNotice}
+        </div>
+      )}
 
-            {/* Subject Input */}
-            <div className="space-y-1.5">
-              <label className="text-xs font-mono text-zinc-400 flex items-center justify-between">
-                <span>SUBJECT</span>
-                <span className="text-zinc-600 text-[11px]">{subject.length} chars</span>
-              </label>
-              <input
-                type="text"
-                value={subject}
-                onChange={(e) => setSubject(e.target.value)}
-                placeholder="Enter email subject line..."
-                className="w-full px-4 py-2.5 rounded-xl bg-surface-elevated border border-white/10 text-white placeholder-zinc-600 text-sm focus:outline-none focus:border-brand-indigo focus:ring-1 focus:ring-brand-indigo transition-all font-sans"
-              />
-            </div>
+      {/* Main Two-Column Probe Console */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+        
+        {/* Left Column: Input Form (6 Cols) */}
+        <div className="lg:col-span-6 bg-paper-sheet border border-paper-border shadow-paper p-5 space-y-4">
+          <div className="flex items-center justify-between pb-2 border-b border-paper-border">
+            <span className="font-serif text-sm font-bold text-ink">
+              Input Message Payload
+            </span>
+            <button
+              onClick={() => {
+                setSubject('');
+                setSender('');
+                setBody('');
+              }}
+              className="text-[11px] font-mono text-ink-muted hover:text-ink cursor-pointer"
+            >
+              Clear Form
+            </button>
+          </div>
 
-            {/* Sender Input */}
-            <div className="space-y-1.5">
-              <label className="text-xs font-mono text-zinc-400">SENDER / FROM</label>
-              <input
-                type="text"
-                value={sender}
-                onChange={(e) => setSender(e.target.value)}
-                placeholder="sender@domain.tld or Organization Name"
-                className="w-full px-4 py-2.5 rounded-xl bg-surface-elevated border border-white/10 text-white placeholder-zinc-600 text-sm focus:outline-none focus:border-brand-indigo focus:ring-1 focus:ring-brand-indigo transition-all font-sans"
-              />
-            </div>
+          {/* Subject Field */}
+          <div className="space-y-1">
+            <label htmlFor="probe-subject" className="text-[10px] font-mono uppercase text-ink-muted block font-semibold">
+              Subject Line:
+            </label>
+            <input
+              id="probe-subject"
+              type="text"
+              value={subject}
+              onChange={(e) => setSubject(e.target.value)}
+              placeholder="e.g. AWS Invoice or Fellowship Announcement"
+              className="w-full bg-paper-canvas border border-paper-border px-3 py-2 text-xs text-ink focus:outline-none focus:border-rust"
+            />
+          </div>
 
-            {/* Body Input */}
-            <div className="space-y-1.5">
-              <label className="text-xs font-mono text-zinc-400 flex items-center justify-between">
-                <span>BODY (SANITIZED PLAINTEXT)</span>
-                <span className="text-zinc-600 text-[11px]">{body.length} chars</span>
-              </label>
-              <textarea
-                rows={5}
-                value={body}
-                onChange={(e) => setBody(e.target.value)}
-                placeholder="Paste or type email text content here..."
-                className="w-full px-4 py-3 rounded-xl bg-surface-elevated border border-white/10 text-white placeholder-zinc-600 text-sm focus:outline-none focus:border-brand-indigo focus:ring-1 focus:ring-brand-indigo transition-all resize-none font-sans leading-relaxed"
-              />
-            </div>
+          {/* Sender Field */}
+          <div className="space-y-1">
+            <label htmlFor="probe-sender" className="text-[10px] font-mono uppercase text-ink-muted block font-semibold">
+              Sender Address / Header:
+            </label>
+            <input
+              id="probe-sender"
+              type="text"
+              value={sender}
+              onChange={(e) => setSender(e.target.value)}
+              placeholder="e.g. billing@amazon.com"
+              className="w-full bg-paper-canvas border border-paper-border px-3 py-2 text-xs text-ink focus:outline-none focus:border-rust"
+            />
+          </div>
 
-            {/* Threshold Sliders */}
-            <div className="p-4 rounded-xl bg-void/50 border border-white/5 space-y-4">
-              <div className="flex items-center gap-2 text-xs font-mono text-zinc-300">
-                <Sliders className="w-3.5 h-3.5 text-brand-cyan" />
-                <span>CONFIDENCE ROUTING THRESHOLDS</span>
+          {/* Body Field */}
+          <div className="space-y-1">
+            <label htmlFor="probe-body" className="text-[10px] font-mono uppercase text-ink-muted block font-semibold">
+              Email Body Text:
+            </label>
+            <textarea
+              id="probe-body"
+              rows={6}
+              value={body}
+              onChange={(e) => setBody(e.target.value)}
+              placeholder="Paste or type email body here..."
+              className="w-full bg-paper-canvas border border-paper-border p-3 text-xs text-ink focus:outline-none focus:border-rust font-sans leading-relaxed"
+            />
+          </div>
+
+          {/* Threshold Sliders */}
+          <div className="pt-2 border-t border-paper-border grid grid-cols-2 gap-4 text-xs font-mono">
+            <div>
+              <div className="flex justify-between text-[11px]">
+                <span className="text-ink-muted">Category Threshold:</span>
+                <span className="text-ink font-bold">{(categoryThreshold * 100).toFixed(0)}%</span>
               </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="space-y-1.5">
-                  <div className="flex justify-between text-xs font-mono">
-                    <span className="text-zinc-400">Category Cutoff</span>
-                    <span className="text-brand-indigo font-bold">{(categoryThreshold * 100).toFixed(0)}%</span>
-                  </div>
-                  <input
-                    type="range"
-                    min="0.4"
-                    max="0.95"
-                    step="0.05"
-                    value={categoryThreshold}
-                    onChange={(e) => setCategoryThreshold(parseFloat(e.target.value))}
-                    className="w-full accent-brand-indigo cursor-pointer h-1.5 bg-zinc-800 rounded-lg appearance-none"
-                  />
-                </div>
-
-                <div className="space-y-1.5">
-                  <div className="flex justify-between text-xs font-mono">
-                    <span className="text-zinc-400">Priority Cutoff</span>
-                    <span className="text-brand-cyan font-bold">{(priorityThreshold * 100).toFixed(0)}%</span>
-                  </div>
-                  <input
-                    type="range"
-                    min="0.4"
-                    max="0.95"
-                    step="0.05"
-                    value={priorityThreshold}
-                    onChange={(e) => setPriorityThreshold(parseFloat(e.target.value))}
-                    className="w-full accent-brand-cyan cursor-pointer h-1.5 bg-zinc-800 rounded-lg appearance-none"
-                  />
-                </div>
-              </div>
+              <input
+                aria-label="Category confidence review threshold"
+                type="range"
+                min="0.30"
+                max="0.95"
+                step="0.05"
+                value={categoryThreshold}
+                onChange={(e) => setCategoryThreshold(parseFloat(e.target.value))}
+                className="w-full accent-rust cursor-pointer mt-1"
+              />
             </div>
 
-            {/* Action Bar */}
-            <div className="flex items-center justify-between pt-2">
-              <button
-                onClick={() => runInference()}
-                disabled={isLoading || (!subject && !body)}
-                className="flex items-center gap-2 px-6 py-3 rounded-xl bg-brand-indigo hover:bg-brand-indigo/90 text-white font-semibold text-sm shadow-glow-indigo transition-all disabled:opacity-50 disabled:cursor-not-allowed group cursor-pointer"
-              >
-                {isLoading ? (
-                  <>
-                    <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                    <span>Projecting Features...</span>
-                  </>
-                ) : (
-                  <>
-                    <Play className="w-4 h-4 fill-current group-hover:scale-110 transition-transform" />
-                    <span>Execute Inference Probe</span>
-                  </>
-                )}
-              </button>
-
-              <span className="text-xs font-mono text-zinc-500 hidden sm:inline-block">
-                Zero external API dependencies
-              </span>
+            <div>
+              <div className="flex justify-between text-[11px]">
+                <span className="text-ink-muted">Priority Threshold:</span>
+                <span className="text-ink font-bold">{(priorityThreshold * 100).toFixed(0)}%</span>
+              </div>
+              <input
+                aria-label="Priority confidence review threshold"
+                type="range"
+                min="0.30"
+                max="0.95"
+                step="0.05"
+                value={priorityThreshold}
+                onChange={(e) => setPriorityThreshold(parseFloat(e.target.value))}
+                className="w-full accent-rust cursor-pointer mt-1"
+              />
             </div>
           </div>
+
+          {/* Run Inference Action Button */}
+          <button
+            onClick={handleRunInference}
+            disabled={isRunning || (!subject && !body)}
+            className="w-full py-2.5 px-4 bg-rust hover:bg-rust-hover text-white text-xs font-sans font-semibold transition-colors flex items-center justify-center gap-2 cursor-pointer shadow-paper-sm disabled:opacity-50"
+          >
+            <Play className={`w-3.5 h-3.5 fill-current ${isRunning ? 'animate-spin' : ''}`} />
+            <span>{isRunning ? 'Calculating Projections...' : 'Run Real-Time Inference Probe'}</span>
+          </button>
         </div>
 
-        {/* Right Column: Live Output & Probability Manifold (5 cols) */}
-        <div className="lg:col-span-5 space-y-6">
-          <AnimatePresence mode="wait">
-            {error && (
-              <motion.div
-                initial={{ opacity: 0, y: -10 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -10 }}
-                className="p-4 rounded-xl bg-brand-rose/10 border border-brand-rose/30 text-brand-rose flex items-start gap-3"
-              >
-                <AlertCircle className="w-5 h-5 shrink-0 mt-0.5" />
-                <div className="text-xs font-mono">
-                  <div className="font-semibold mb-1">Inference Engine Error</div>
-                  <div>{error}</div>
-                </div>
-              </motion.div>
-            )}
-
-            {result ? (
-              <motion.div
-                key="result"
-                initial={{ opacity: 0, scale: 0.98 }}
-                animate={{ opacity: 1, scale: 1 }}
-                transition={{ duration: 0.3 }}
-                className="rounded-2xl bg-surface-elevated border border-white/10 p-6 backdrop-blur-xl shadow-tactile space-y-6"
-              >
-                {/* Header: Latency & Model Lineage */}
-                <div className="flex items-center justify-between border-b border-white/5 pb-4">
-                  <div className="flex items-center gap-2">
-                    <Zap className="w-4 h-4 text-brand-amber" />
-                    <span className="text-xs font-mono text-zinc-400">LATENCY:</span>
-                    <MetricCounter
-                      value={result.latency_ms}
-                      decimals={2}
-                      suffix=" ms"
-                      className="text-sm font-bold text-white"
-                    />
-                  </div>
-
-                  <div className="text-xs font-mono text-zinc-500">
-                    MODEL: <span className="text-brand-indigo font-bold">{result.model_label.toUpperCase()}</span>
-                  </div>
+        {/* Right Column: Inference Output Sheet (6 Cols) */}
+        <div className="lg:col-span-6 space-y-4">
+          {result ? (
+            <div className="bg-paper-sheet border border-paper-border shadow-paper p-5 space-y-5">
+              
+              {/* Output Header */}
+              <div className="flex items-center justify-between pb-3 border-b border-paper-border">
+                <div className="flex items-center gap-2">
+                  <span className="font-mono text-xs font-bold text-ink">
+                    MODEL {result.model_label.toUpperCase()} OUTPUT
+                  </span>
+                  <span className="text-paper-border">·</span>
+                  <span className="font-mono text-[10px] text-ink-muted">
+                    {result.latency_ms.toFixed(1)} ms
+                  </span>
                 </div>
 
-                {/* Primary Decision Banner */}
-                <div className="p-4 rounded-xl bg-surface border border-white/5 space-y-3">
-                  <div className="flex items-center justify-between">
-                    <span className="text-[11px] font-mono text-zinc-500 tracking-wider">PREDICTED DECISION</span>
-                    <div
-                      className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-mono ${
-                        result.needs_review
-                          ? 'bg-brand-amber/15 text-brand-amber border border-brand-amber/30'
-                          : 'bg-brand-emerald/15 text-brand-emerald border border-brand-emerald/30'
-                      }`}
-                    >
-                      {result.needs_review ? (
-                        <>
-                          <AlertCircle className="w-3.5 h-3.5" />
-                          <span>NEEDS HUMAN REVIEW</span>
-                        </>
-                      ) : (
-                        <>
-                          <CheckCircle2 className="w-3.5 h-3.5" />
-                          <span>AUTO-CLASSIFIED</span>
-                        </>
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-3 pt-1">
-                    <div>
-                      <div className="text-xs text-zinc-400 font-mono">Category</div>
-                      <div className="text-lg font-bold text-white capitalize">
-                        {result.category}
-                      </div>
-                      <div className="text-xs font-mono text-zinc-400 mt-0.5">
-                        <MetricCounter value={result.category_confidence * 100} decimals={1} suffix="%" /> conf
-                      </div>
-                    </div>
-
-                    <div>
-                      <div className="text-xs text-zinc-400 font-mono">Priority</div>
-                      <div className="text-lg font-bold text-white capitalize">
-                        {result.priority}
-                      </div>
-                      <div className="text-xs font-mono text-zinc-400 mt-0.5">
-                        <MetricCounter value={result.priority_confidence * 100} decimals={1} suffix="%" /> conf
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* All Category Probability Distributions */}
-                <div className="space-y-3">
-                  <div className="flex justify-between items-center text-xs font-mono text-zinc-400">
-                    <span>CATEGORY PROBABILITY PROFILE</span>
-                    <span className="text-[10px] text-zinc-600">Uncalibrated Log-Loss</span>
-                  </div>
-
-                  <div className="space-y-2">
-                    {Object.entries(result.all_category_scores)
-                      .sort(([, a], [, b]) => b - a)
-                      .map(([cat, score]) => (
-                        <div key={cat} className="space-y-1">
-                          <div className="flex justify-between text-xs">
-                            <span className={`capitalize ${cat === result.category ? 'text-white font-medium' : 'text-zinc-400'}`}>
-                              {cat}
-                            </span>
-                            <span className="font-mono text-zinc-300">
-                              {(score * 100).toFixed(1)}%
-                            </span>
-                          </div>
-                          <div className="h-1.5 w-full bg-zinc-800/80 rounded-full overflow-hidden">
-                            <motion.div
-                              initial={{ width: 0 }}
-                              animate={{ width: `${Math.max(score * 100, 2)}%` }}
-                              transition={{ duration: 0.5, ease: 'easeOut' }}
-                              className={`h-full rounded-full ${
-                                cat === result.category ? (CATEGORY_COLORS[cat] || 'bg-brand-indigo') : 'bg-zinc-600'
-                              }`}
-                            />
-                          </div>
-                        </div>
-                      ))}
-                  </div>
-                </div>
-
-                {/* Priority Distribution */}
-                <div className="space-y-3 pt-2">
-                  <div className="flex justify-between items-center text-xs font-mono text-zinc-400">
-                    <span>PRIORITY PROBABILITY PROFILE</span>
-                  </div>
-                  <div className="grid grid-cols-3 gap-2">
-                    {['high', 'normal', 'low'].map((prio) => {
-                      const score = result.all_priority_scores[prio] || 0;
-                      const isChosen = prio === result.priority;
-                      return (
-                        <div
-                          key={prio}
-                          className={`p-2.5 rounded-xl border text-center font-mono ${
-                            isChosen
-                              ? 'bg-white/10 border-white/20 text-white'
-                              : 'bg-surface/50 border-white/5 text-zinc-400'
-                          }`}
-                        >
-                          <div className="text-[11px] capitalize">{prio}</div>
-                          <div className="text-sm font-semibold mt-0.5">
-                            {(score * 100).toFixed(1)}%
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                {/* Routing Reason Explanation */}
-                <div className="p-3.5 rounded-xl bg-void/60 border border-white/5 text-xs text-zinc-300 space-y-1 font-sans">
-                  <div className="text-[10px] font-mono text-zinc-500 uppercase tracking-wider">
-                    EXPLAINABLE ROUTING REASON
-                  </div>
-                  <p className="leading-relaxed">{result.routing_reason}</p>
-                </div>
-
-                {/* Extracted Entities & RFC 5545 */}
-                {result.extracted_entities && result.extracted_entities.length > 0 && (
-                  <div className="space-y-2 pt-2 border-t border-white/5">
-                    <div className="flex items-center gap-1.5 text-xs font-mono text-zinc-400">
-                      <Tag className="w-3.5 h-3.5 text-brand-cyan" />
-                      <span>EXTRACTED ENTITIES & DEADLINES</span>
-                    </div>
-                    <div className="flex flex-wrap gap-2">
-                      {result.extracted_entities.map((e, idx) => (
-                        <div
-                          key={idx}
-                          className="px-2.5 py-1 rounded-lg bg-surface border border-white/10 text-xs font-mono flex items-center gap-1.5 text-zinc-200"
-                        >
-                          <span className="text-[10px] text-brand-cyan uppercase">{e.type}:</span>
-                          <span>{e.value}</span>
-                          <span className="text-[10px] text-zinc-500 font-sans">({e.raw_phrase})</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
+                {result.needs_review ? (
+                  <span className="px-2 py-0.5 bg-amber-100 text-amber-900 border border-amber-300 font-mono text-[10px] font-bold uppercase">
+                    Needs Review
+                  </span>
+                ) : (
+                  <span className="px-2 py-0.5 bg-emerald-100 text-emerald-900 border border-emerald-300 font-mono text-[10px] font-bold uppercase">
+                    Classified
+                  </span>
                 )}
-              </motion.div>
-            ) : (
-              /* Empty state before running inference */
-              <motion.div
-                key="empty"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                className="rounded-2xl bg-surface/40 border border-dashed border-white/10 p-12 text-center flex flex-col items-center justify-center space-y-4 min-h-[380px]"
-              >
-                <div className="w-14 h-14 rounded-2xl bg-brand-indigo/10 border border-brand-indigo/20 flex items-center justify-center text-brand-indigo">
-                  <Sparkles className="w-7 h-7" />
+              </div>
+
+              {/* Classification Cards */}
+              <div className="grid grid-cols-2 gap-3 text-xs">
+                <div className="p-3 bg-paper-canvas border border-paper-border">
+                  <span className="text-[10px] font-mono uppercase text-ink-faint block">Predicted Category</span>
+                  <strong className="font-serif text-lg text-ink font-bold block mt-0.5">
+                    {result.category}
+                  </strong>
+                  <span className={`font-mono text-xs font-semibold ${result.category_confidence < categoryThreshold ? 'text-amber-800' : 'text-emerald-800'}`}>
+                    {(result.category_confidence * 100).toFixed(1)}% confidence
+                  </span>
+                </div>
+
+                <div className="p-3 bg-paper-canvas border border-paper-border">
+                  <span className="text-[10px] font-mono uppercase text-ink-faint block">Predicted Priority</span>
+                  <strong className="font-serif text-lg text-ink font-bold block mt-0.5">
+                    {result.priority}
+                  </strong>
+                  <span className={`font-mono text-xs font-semibold ${result.priority_confidence < priorityThreshold ? 'text-amber-800' : 'text-emerald-800'}`}>
+                    {(result.priority_confidence * 100).toFixed(1)}% confidence
+                  </span>
+                </div>
+              </div>
+
+              {/* Routing & Action Suggestion */}
+              <div className="p-3 bg-paper-subtle border border-paper-border text-xs space-y-1">
+                <div>
+                  <span className="font-semibold text-ink">Suggested Action:</span>{' '}
+                  <span className="text-ink-light">{result.suggested_action}</span>
                 </div>
                 <div>
-                  <h3 className="text-base font-semibold text-white">Inference Engine Ready</h3>
-                  <p className="text-xs text-zinc-400 mt-1 max-w-xs mx-auto">
-                    Type a message or select a preset above, then click <strong>Execute Inference Probe</strong> to evaluate across the feature space.
-                  </p>
+                  <span className="font-semibold text-ink">Routing Reason:</span>{' '}
+                  <span className="text-ink-muted italic">{result.routing_reason}</span>
                 </div>
-                <div className="text-[11px] font-mono text-zinc-500 pt-2">
-                  [BOUNDED HASH: 4096-DIM · SGD LOSS: LOG]
+              </div>
+
+              {/* Category Probability Distributions (Horizontal Bars) */}
+              <div className="space-y-2">
+                <span className="text-[10px] font-mono uppercase text-ink-faint block font-semibold">
+                  Category Uncalibrated Log-Loss Probabilities
+                </span>
+                <div className="space-y-1.5 text-xs font-mono">
+                  {Object.entries(result.all_category_scores)
+                    .sort(([, a], [, b]) => b - a)
+                    .map(([cat, score]) => (
+                      <div key={cat} className="space-y-0.5">
+                        <div className="flex justify-between text-[11px]">
+                          <span className={cat === result.category ? 'font-bold text-ink' : 'text-ink-muted'}>
+                            {cat}
+                          </span>
+                          <span className="font-bold text-ink">{(score * 100).toFixed(1)}%</span>
+                        </div>
+                        <div className="w-full h-1.5 bg-paper-border overflow-hidden">
+                          <div
+                            className={`h-full ${cat === result.category ? 'bg-rust' : 'bg-ink-muted'}`}
+                            style={{ width: `${Math.max(2, score * 100)}%` }}
+                          />
+                        </div>
+                      </div>
+                    ))}
                 </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
+              </div>
+
+              {/* Priority Probability Distributions */}
+              <div className="space-y-2 pt-2 border-t border-paper-border">
+                <span className="text-[10px] font-mono uppercase text-ink-faint block font-semibold">
+                  Priority Probabilities
+                </span>
+                <div className="space-y-1.5 text-xs font-mono">
+                  {Object.entries(result.all_priority_scores)
+                    .sort(([, a], [, b]) => b - a)
+                    .map(([pri, score]) => (
+                      <div key={pri} className="space-y-0.5">
+                        <div className="flex justify-between text-[11px]">
+                          <span className={pri === result.priority ? 'font-bold text-ink' : 'text-ink-muted'}>
+                            {pri}
+                          </span>
+                          <span className="font-bold text-ink">{(score * 100).toFixed(1)}%</span>
+                        </div>
+                        <div className="w-full h-1.5 bg-paper-border overflow-hidden">
+                          <div
+                            className={`h-full ${pri === result.priority ? 'bg-rust' : 'bg-ink-muted'}`}
+                            style={{ width: `${Math.max(2, score * 100)}%` }}
+                          />
+                        </div>
+                      </div>
+                    ))}
+                </div>
+              </div>
+
+              {/* Extracted Entities */}
+              {result.extracted_entities && result.extracted_entities.length > 0 && (
+                <div className="space-y-2 pt-2 border-t border-paper-border">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-mono uppercase text-ink-faint block font-semibold">
+                      Extracted Entities
+                    </span>
+                    {result.has_calendar_event && (
+                      <button
+                        onClick={handleDownloadIcs}
+                        className="inline-flex items-center gap-1 text-[11px] font-mono text-rust hover:underline cursor-pointer"
+                      >
+                        <Download className="w-3 h-3" />
+                        <span>Download Event .ics</span>
+                      </button>
+                    )}
+                  </div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {result.extracted_entities.map((ent, idx) => (
+                      <span
+                        key={idx}
+                        className="px-2 py-0.5 bg-paper-canvas border border-paper-border font-mono text-[11px] text-ink"
+                      >
+                        <strong className="text-rust">{ent.type}:</strong> {ent.value}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+            </div>
+          ) : (
+            <div className="p-8 bg-paper-sheet border border-paper-border text-center space-y-2 text-ink-muted shadow-paper-sm">
+              <Layers className="w-8 h-8 text-ink-faint mx-auto" />
+              <p className="font-serif text-base font-semibold text-ink">Inference probe ready</p>
+              <p className="text-xs">Select a preset or enter message text on the left and click "Run Real-Time Inference Probe".</p>
+            </div>
+          )}
         </div>
+
       </div>
+
     </div>
   );
 };

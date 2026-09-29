@@ -321,13 +321,18 @@ def create_app(service: Optional[InboxLearnService] = None) -> FastAPI:
         versions = [_clean_version_dict(v) for v in svc.repo.versions()]
         for v in versions:
             v["metadata"] = json.loads(v["metadata_json"])
-            eval_res = svc.current_evaluation(v["id"])
-            v["has_evaluation"] = eval_res is not None
-            if eval_res:
-                v["evaluation_summary"] = {
-                    "category_accuracy": eval_res.get("category_accuracy"),
-                    "priority_accuracy": eval_res.get("priority_accuracy"),
-                }
+            eval_row = svc.current_evaluation(v["id"])
+            v["has_evaluation"] = eval_row is not None
+            if eval_row:
+                try:
+                    eval_data = json.loads(eval_row["results_json"])
+                    updated_metrics = eval_data.get("updated", {})
+                    v["evaluation_summary"] = {
+                        "category_accuracy": updated_metrics.get("category_accuracy"),
+                        "priority_accuracy": updated_metrics.get("priority_accuracy"),
+                    }
+                except Exception:
+                    v["evaluation_summary"] = None
         return {"versions": versions}
 
     @app.post("/api/models/prepare")
@@ -410,7 +415,23 @@ def create_app(service: Optional[InboxLearnService] = None) -> FastAPI:
     dist_dir = Path(__file__).parent.parent / "frontend" / "dist"
     if dist_dir.exists():
         from fastapi.staticfiles import StaticFiles
-        app.mount("/", StaticFiles(directory=str(dist_dir), html=True), name="frontend")
+        from fastapi.responses import FileResponse
+
+        index_file = dist_dir / "index.html"
+
+        class SPAStaticFiles(StaticFiles):
+            async def get_response(self, path: str, scope):
+                try:
+                    response = await super().get_response(path, scope)
+                    if response.status_code == 404 and index_file.exists():
+                        return FileResponse(index_file)
+                    return response
+                except Exception:
+                    if index_file.exists():
+                        return FileResponse(index_file)
+                    raise
+
+        app.mount("/", SPAStaticFiles(directory=str(dist_dir), html=True), name="frontend")
 
     return app
 

@@ -1,163 +1,174 @@
-import React, { useEffect, useRef } from 'react';
-import gsap from 'gsap';
-import { ScrollTrigger } from 'gsap/ScrollTrigger';
+import React from 'react';
 import { 
-  Inbox, 
-  Binary, 
-  GitBranch, 
-  CheckSquare, 
-  Cpu, 
   ShieldCheck, 
-  ArrowRight 
+  Cpu, 
+  GitBranch, 
+  FileCheck, 
+  RotateCcw, 
+  Lock, 
+  Terminal, 
+  CheckCircle2,
+  AlertCircle,
+  Database,
+  Layers,
+  ArrowRight
 } from 'lucide-react';
 
-gsap.registerPlugin(ScrollTrigger);
-
-const PIPELINE_STAGES = [
+const STAGES = [
   {
     step: '01',
-    title: 'Intake & Bounded Sanitization',
-    desc: 'RFC 822 MIME parsing with strict 5MB bounds, HTML strip to plaintext, and zero network leakage.',
-    icon: Inbox,
-    color: 'from-blue-500/20 to-indigo-500/20',
-    border: 'border-blue-500/30',
-    tag: 'READ-ONLY INTAKE',
+    title: 'Intake & Boundary Sanitization',
+    desc: 'RFC 822 / MIME parsing with strict 5MB EML / 20MB MBOX bounds and 10-level nesting limits. Strips HTML to plain text, neutralizes formula injection (=, +, -, @), and skips binary attachments.',
+    tag: 'Boundary Security',
   },
   {
     step: '02',
-    title: 'Stateless 4,096-D Hashing',
-    desc: 'HashingVectorizer mapping 1-2 ngrams into 4096 dimensions. No vocabulary drift or dictionary sync overhead.',
-    icon: Binary,
-    color: 'from-indigo-500/20 to-purple-500/20',
-    border: 'border-indigo-500/30',
-    tag: 'FEATURE PROJECTION',
+    title: 'Stateless Hashing Vectorization',
+    desc: 'Transforms text using HashingVectorizer(n_features=4096, ngram_range=(1,2)) with L2 normalization. Because hashing is purely mathematical and stateless, vocabulary drift is eliminated across retraining iterations.',
+    tag: 'Stateless Projection',
   },
   {
     step: '03',
-    title: 'Twin SGD Confidence Routing',
-    desc: 'Dual log-loss classifiers route predictions below thresholds (65% category, 60% priority) to human triage.',
-    icon: GitBranch,
-    color: 'from-amber-500/20 to-orange-500/20',
-    border: 'border-amber-500/30',
-    tag: 'CONFIDENCE GATE',
+    title: 'Confidence-Threshold Routing',
+    desc: 'Dual SGDClassifier solvers output uncalibrated log-loss estimates. Any prediction below category threshold (0.70) or priority threshold (0.70) is routed to the human Review Desk for verification.',
+    tag: 'Human Triage',
   },
   {
     step: '04',
-    title: 'Operator Review & Correction',
-    desc: 'Human corrections are stored with batch checksum tokens preventing stale concurrent overwrites.',
-    icon: CheckSquare,
-    color: 'from-cyan-500/20 to-teal-500/20',
-    border: 'border-cyan-500/30',
-    tag: 'HUMAN-IN-THE-LOOP',
+    title: 'Deduplicated Candidate Preparation',
+    desc: 'Retraining occurs in an isolated write transaction. Requests are deduplicated in candidate_registry via compound key (parent_id, seed_hash, feedback_revision_ids, recipe_version).',
+    tag: 'Safe Retraining',
   },
   {
     step: '05',
-    title: 'Split-Isolated Candidate Training',
-    desc: 'assert_split_isolated() guarantees zero normalized overlap before creating safe IBL1 snapshots.',
-    icon: Cpu,
-    color: 'from-violet-500/20 to-pink-500/20',
-    border: 'border-violet-500/30',
-    tag: 'SAFE IBL1 SERIALIZATION',
+    title: 'Pre-Activation Prediction Diffing',
+    desc: 'Operators inspect side-by-side prediction diffs across all stored emails. Training-set membership is explicitly marked so operators never confuse training memorization with generalization.',
+    tag: 'Regression Prevention',
   },
   {
     step: '06',
-    title: 'Held-Out Eval Gate & Rollback',
-    desc: 'Candidates cannot activate without verified held-out evaluation. One click restores historical weights.',
-    icon: ShieldCheck,
-    color: 'from-emerald-500/20 to-green-500/20',
-    border: 'border-emerald-500/30',
-    tag: 'EVALUATION GATING',
+    title: 'Evaluation Gate & Safe Rollback',
+    desc: 'Activation strictly checks SQLite for a verified evaluation run matching the held-out dataset hash (demo_eval.csv). Safe IBL1 array serialization allows instantaneous bit-exact rollback to any prior version.',
+    tag: 'Quality Enforcement',
+  },
+];
+
+const ENGINEERING_GUARANTEES = [
+  {
+    problem: 'Silent Deployment Regressions',
+    solution: 'Pre-activation prediction diffing across all inbox emails with explicit training-set membership markers before activating candidate models.',
+  },
+  {
+    problem: 'Bypassing Quality Gates',
+    solution: 'The Python service layer (InboxLearnService.activate) verifies held-out evaluation in SQLite before updating the active pointer.',
+  },
+  {
+    problem: 'Arbitrary Code Execution via Deserialization',
+    solution: 'Safe explicit IBL1 binary serialization replaces Python pickle. Weights are strictly validated float64 arrays with SHA-256 integrity digests.',
+  },
+  {
+    problem: 'Train / Test Data Leakage',
+    solution: 'Evaluation routines enforce assert_split_isolated(), normalizing text (NFKC, case-folding, whitespace collapsing) and asserting zero split overlap.',
+  },
+  {
+    problem: 'Vocabulary Synchronization Drift',
+    solution: 'Stateless 4,096-dimensional hashing vectorization guarantees identical feature projection without mutable dictionary files.',
+  },
+  {
+    problem: 'Feedback Revision Stale Gradients',
+    solution: 'When an operator edits an existing feedback record, the system detects the revision and triggers a clean rebuild from baseline seed plus latest corrections.',
   },
 ];
 
 export const PipelineLifecycle: React.FC = () => {
-  const sectionRef = useRef<HTMLDivElement>(null);
-  const cardsRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const isReduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    if (isReduced) return;
-
-    const ctx = gsap.context(() => {
-      const cards = gsap.utils.toArray('.pipeline-card');
-
-      gsap.from(cards, {
-        scrollTrigger: {
-          trigger: cardsRef.current,
-          start: 'top 85%',
-          end: 'bottom 40%',
-          scrub: 0.8,
-        },
-        y: 60,
-        opacity: 0.15,
-        stagger: 0.15,
-        ease: 'power2.out',
-      });
-    }, sectionRef);
-
-    return () => ctx.revert();
-  }, []);
-
   return (
-    <section ref={sectionRef} className="py-24 px-4 sm:px-6 lg:px-8 relative overflow-hidden">
-      <div className="max-w-7xl mx-auto">
-        {/* Section Header */}
-        <div className="text-center max-w-3xl mx-auto mb-16">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-brand-indigo/10 border border-brand-indigo/20 text-brand-indigo text-xs font-mono mb-4">
-            <span>[PIPELINE ARCHITECTURE]</span>
+    <div className="space-y-8 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+      
+      {/* Header */}
+      <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 pb-4 border-b border-paper-border">
+        <div>
+          <div className="flex items-center gap-2 mb-1">
+            <span className="font-mono text-[10px] tracking-wider uppercase text-rust font-semibold">
+              05 SYSTEM ARCHITECTURE
+            </span>
+            <span className="text-paper-border">·</span>
+            <span className="font-mono text-[10px] text-ink-muted">
+              SYSTEM GUARANTEES & CONTINUOUS LEARNING
+            </span>
           </div>
-          <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold tracking-tight text-white mb-4">
-            Engineered for Continuous, Safe Learning
+          <h2 className="font-serif text-2xl sm:text-3xl font-bold text-ink">
+            Architecture & Engineering Principles
           </h2>
-          <p className="text-base text-zinc-400">
-            Every incoming message traverses strict boundaries: stateless vectorization, confidence-routed human triage, split-isolated candidate training, and evaluation-gated deployment.
+          <p className="text-xs text-ink-muted mt-1 max-w-2xl leading-relaxed">
+            InboxLearn runs entirely on local hardware with zero external cloud dependencies. Below is the 6-stage lifecycle and the explicit guarantees that ensure reliability, data isolation, and safety.
           </p>
         </div>
 
-        {/* Scroll-scrubbed Cards Grid */}
-        <div 
-          ref={cardsRef} 
-          className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 relative"
-        >
-          {PIPELINE_STAGES.map((stage, idx) => {
-            const Icon = stage.icon;
-            return (
-              <div
-                key={stage.step}
-                className={`pipeline-card relative rounded-2xl bg-surface/80 border ${stage.border} p-6 backdrop-blur-md flex flex-col justify-between hover:bg-surface-elevated transition-colors group`}
-              >
-                <div>
-                  <div className="flex items-center justify-between mb-4">
-                    <span className="font-mono text-xs px-2.5 py-1 rounded bg-white/5 text-zinc-400 border border-white/5">
-                      STAGE {stage.step}
-                    </span>
-                    <span className="font-mono text-[10px] tracking-wider text-zinc-500">
-                      {stage.tag}
-                    </span>
-                  </div>
-
-                  <div className={`w-12 h-12 rounded-xl bg-gradient-to-br ${stage.color} flex items-center justify-center mb-4 text-white border border-white/10 group-hover:scale-105 transition-transform`}>
-                    <Icon className="w-6 h-6" />
-                  </div>
-
-                  <h3 className="text-lg font-semibold text-white mb-2 group-hover:text-brand-indigo transition-colors">
-                    {stage.title}
-                  </h3>
-
-                  <p className="text-sm text-zinc-400 leading-relaxed">
-                    {stage.desc}
-                  </p>
-                </div>
-
-                <div className="pt-6 mt-4 border-t border-white/5 flex items-center justify-between text-xs text-zinc-500 font-mono">
-                  <span>Isolated Boundary</span>
-                  <ArrowRight className="w-3.5 h-3.5 opacity-0 group-hover:opacity-100 group-hover:translate-x-1 transition-all text-brand-indigo" />
-                </div>
-              </div>
-            );
-          })}
+        <div className="font-mono text-xs text-ink-muted bg-paper-sheet border border-paper-border px-3 py-2 shadow-paper-sm">
+          <span>Python 3.12 · scikit-learn · SQLite · FastAPI</span>
         </div>
       </div>
-    </section>
+
+      {/* 6-Stage Lifecycle Grid */}
+      <div className="space-y-3">
+        <h3 className="font-serif text-lg font-bold text-ink">
+          The Six-Stage Continuous Learning Lifecycle
+        </h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {STAGES.map((s) => (
+            <div key={s.step} className="p-4 bg-paper-sheet border border-paper-border shadow-paper space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="font-mono text-xs text-rust font-bold">{s.step}</span>
+                <span className="px-1.5 py-0.5 bg-paper-subtle border border-paper-border font-mono text-[10px] text-ink-muted">
+                  {s.tag}
+                </span>
+              </div>
+              <h4 className="font-serif text-base font-bold text-ink leading-snug">
+                {s.title}
+              </h4>
+              <p className="text-xs text-ink-muted leading-relaxed font-sans">
+                {s.desc}
+              </p>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Engineering Guarantees Table */}
+      <div className="bg-paper-sheet border border-paper-border shadow-paper p-5 space-y-4">
+        <div className="pb-3 border-b border-paper-border">
+          <h3 className="font-serif text-lg font-bold text-ink">
+            Core Engineering & Safety Guarantees
+          </h3>
+          <p className="text-xs text-ink-muted mt-0.5">
+            How production machine learning risks are systematically mitigated at the application layer.
+          </p>
+        </div>
+
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-xs editorial-table">
+            <thead className="bg-paper-subtle">
+              <tr>
+                <th className="p-3 w-1/3">Production Problem</th>
+                <th className="p-3 w-2/3">InboxLearn Architecture Implementation</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-paper-border bg-paper-sheet">
+              {ENGINEERING_GUARANTEES.map((g, idx) => (
+                <tr key={idx}>
+                  <td className="p-3 font-serif font-bold text-ink align-top">
+                    {g.problem}
+                  </td>
+                  <td className="p-3 text-ink-light font-sans leading-relaxed align-top">
+                    {g.solution}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+    </div>
   );
 };

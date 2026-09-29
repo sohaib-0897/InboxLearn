@@ -1,21 +1,23 @@
 import React, { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'motion/react';
 import { 
   History, 
   RotateCcw, 
   ShieldCheck, 
   CheckCircle2, 
   GitCommit, 
-  Binary, 
   Clock, 
   Cpu, 
-  Check 
+  Check, 
+  AlertTriangle,
+  RefreshCw,
+  FileCheck
 } from 'lucide-react';
 import { api, ModelVersion } from '../api/client';
 
 export const VersionLedger: React.FC<{ onRollback?: () => void }> = ({ onRollback }) => {
   const [versions, setVersions] = useState<ModelVersion[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [rollingBackId, setRollingBackId] = useState<number | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -25,8 +27,10 @@ export const VersionLedger: React.FC<{ onRollback?: () => void }> = ({ onRollbac
     try {
       const res = await api.getModels();
       setVersions(res.versions);
+      setLoadError(null);
     } catch (err) {
       console.error('Failed to load model versions', err);
+      setLoadError(err instanceof Error ? err.message : 'Model versions could not be loaded.');
     } finally {
       setIsLoading(false);
     }
@@ -42,7 +46,7 @@ export const VersionLedger: React.FC<{ onRollback?: () => void }> = ({ onRollbac
     setErrorMessage(null);
     try {
       const res = await api.rollbackModel(versionId);
-      setSuccessMessage(`Successfully restored active model pointer to ${res.rolled_back_to.label}!`);
+      setSuccessMessage(`Successfully rolled back active model pointer to ${res.rolled_back_to.label}! All probe predictions and confidence estimates return to historical state.`);
       await loadVersions();
       if (onRollback) onRollback();
     } catch (err: any) {
@@ -53,161 +57,172 @@ export const VersionLedger: React.FC<{ onRollback?: () => void }> = ({ onRollbac
   };
 
   return (
-    <div className="space-y-8 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <div className="space-y-6 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+      
       {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-white/10 pb-6">
+      <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 pb-4 border-b border-paper-border">
         <div>
-          <div className="flex items-center gap-2 mb-2">
-            <span className="w-2 h-2 rounded-full bg-brand-emerald animate-pulse" />
-            <span className="font-mono text-xs text-brand-emerald uppercase tracking-wider">
-              IMMUTABLE SNAPSHOT LEDGER
+          <div className="flex items-center gap-2 mb-1">
+            <span className="font-mono text-[10px] tracking-wider uppercase text-rust font-semibold">
+              04 VERSION LEDGER
+            </span>
+            <span className="text-paper-border">·</span>
+            <span className="font-mono text-[10px] text-ink-muted">
+              IMMUTABLE SNAPSHOTS & EXACT ROLLBACK
             </span>
           </div>
-          <h2 className="text-2xl sm:text-3xl font-bold text-white tracking-tight">
-            Model Lineage & One-Click Rollback
+          <h2 className="font-serif text-2xl sm:text-3xl font-bold text-ink">
+            Model Lineage & Rollback Ledger
           </h2>
-          <p className="text-sm text-zinc-400 mt-1">
-            Historical models are stored as immutable snapshots in SQLite using safe IBL1 serialization. Any version can be restored instantly with exact bit-level reproduction.
+          <p className="text-xs text-ink-muted mt-1 max-w-2xl leading-relaxed">
+            Historical models are persisted as immutable snapshots in SQLite using safe IBL1 serialization (validated float64 arrays, class names, step counters, and SHA-256 digests). Any version can be restored with bit-exact reproducibility.
           </p>
         </div>
 
-        <div className="flex items-center gap-2 font-mono text-xs text-zinc-400">
-          <ShieldCheck className="w-4 h-4 text-brand-emerald" />
-          <span>Zero Pickle Blobs · IBL1 Explicit Array Format</span>
+        <div className="flex items-center gap-2 font-mono text-xs text-ink-muted bg-paper-sheet border border-paper-border px-3 py-2 shadow-paper-sm">
+          <ShieldCheck className="w-4 h-4 text-emerald-800" />
+          <span>IBL1 Safe Serialization · Zero Pickle Blobs</span>
         </div>
       </div>
 
+      {/* Notifications */}
       {successMessage && (
-        <div className="p-4 rounded-xl bg-brand-emerald/10 border border-brand-emerald/30 text-brand-emerald text-xs font-mono flex items-center gap-2">
-          <CheckCircle2 className="w-4 h-4 shrink-0" />
-          <span>{successMessage}</span>
+        <div className="p-3.5 bg-emerald-50 border-l-4 border-emerald-700 border-y border-r border-emerald-200 text-xs text-emerald-950 flex items-center justify-between shadow-paper-sm">
+          <div className="flex items-center gap-2">
+            <CheckCircle2 className="w-4 h-4 text-emerald-700 flex-shrink-0" />
+            <span>{successMessage}</span>
+          </div>
+          <button onClick={() => setSuccessMessage(null)} className="text-xs text-emerald-800 hover:text-emerald-950 underline cursor-pointer">
+            Dismiss
+          </button>
         </div>
       )}
 
       {errorMessage && (
-        <div className="p-4 rounded-xl bg-brand-rose/10 border border-brand-rose/30 text-brand-rose text-xs font-mono flex items-center gap-2">
-          <span>{errorMessage}</span>
+        <div className="p-3.5 bg-rose-50 border-l-4 border-rose-700 border-y border-r border-rose-200 text-xs text-rose-950 flex items-center justify-between shadow-paper-sm">
+          <div className="flex items-center gap-2">
+            <AlertTriangle className="w-4 h-4 text-rose-700 flex-shrink-0" />
+            <span>{errorMessage}</span>
+          </div>
+          <button onClick={() => setErrorMessage(null)} className="text-xs text-rose-800 hover:text-rose-950 underline cursor-pointer">
+            Dismiss
+          </button>
         </div>
       )}
 
-      {/* Ledger Table / Cards */}
-      {isLoading ? (
-        <div className="py-20 text-center flex flex-col items-center justify-center space-y-3">
-          <div className="w-8 h-8 border-2 border-brand-emerald/20 border-t-brand-emerald rounded-full animate-spin" />
-          <span className="text-xs font-mono text-zinc-400">Loading version lineage...</span>
-        </div>
-      ) : (
-        <div className="space-y-4">
-          {versions.map((ver) => {
-            const isActive = Boolean(ver.is_active);
-            const meta = ver.metadata || {};
-
-            return (
-              <motion.div
-                key={ver.id}
-                layout
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                className={`rounded-2xl border p-6 backdrop-blur-xl transition-all ${
-                  isActive
-                    ? 'bg-surface-elevated/90 border-brand-emerald/40 shadow-tactile'
-                    : 'bg-surface/60 border-white/5 hover:border-white/10'
-                }`}
-              >
-                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                  {/* Left: Version Identity & Tag */}
-                  <div className="flex items-start gap-4">
-                    <div className={`w-12 h-12 rounded-xl flex items-center justify-center font-mono font-bold text-base border shrink-0 ${
-                      isActive
-                        ? 'bg-brand-emerald/15 text-brand-emerald border-brand-emerald/30 shadow-glow-emerald'
-                        : 'bg-surface-subtle text-zinc-400 border-white/10'
-                    }`}>
-                      {ver.label.toUpperCase()}
-                    </div>
-
-                    <div className="space-y-1">
-                      <div className="flex items-center gap-2.5">
-                        <h4 className="text-base font-bold text-white font-mono">
-                          Model Version {ver.label}
-                        </h4>
-                        <span className="text-xs font-mono px-2 py-0.5 rounded bg-white/5 text-zinc-400 border border-white/5 capitalize">
-                          {ver.kind}
-                        </span>
-                        {isActive && (
-                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-mono bg-brand-emerald/15 text-brand-emerald border border-brand-emerald/30">
-                            <Check className="w-3 h-3" />
-                            ACTIVE DEPLOYMENT
-                          </span>
-                        )}
-                      </div>
-
-                      <div className="text-xs text-zinc-400 font-mono flex flex-wrap items-center gap-3">
-                        <span className="flex items-center gap-1">
-                          <Clock className="w-3 h-3 text-zinc-500" /> {ver.created_at}
-                        </span>
-                        <span>·</span>
-                        <span>Parent: {ver.parent_id ? `v${ver.parent_id}` : 'None (Root)'}</span>
-                        <span>·</span>
-                        <span className="text-brand-indigo capitalize">
-                          {meta.training_mode ? meta.training_mode.replace(/_/g, ' ') : 'Seed baseline'}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Right: Rollback / Active CTA */}
-                  <div className="flex items-center gap-3 self-end md:self-auto">
-                    {isActive ? (
-                      <div className="px-4 py-2 rounded-xl bg-brand-emerald/10 border border-brand-emerald/30 text-brand-emerald font-mono text-xs flex items-center gap-1.5">
-                        <CheckCircle2 className="w-4 h-4" />
-                        <span>Currently Serving Predictions</span>
-                      </div>
-                    ) : (
-                      <button
-                        onClick={() => handleRollback(ver.id)}
-                        disabled={rollingBackId === ver.id}
-                        className="flex items-center gap-2 px-4 py-2 rounded-xl bg-surface-subtle hover:bg-surface-highlight border border-white/10 text-white font-mono text-xs transition-all hover:border-brand-emerald/40 cursor-pointer disabled:opacity-50"
-                      >
-                        {rollingBackId === ver.id ? (
-                          <>
-                            <span className="w-3.5 h-3.5 border border-white/30 border-t-white rounded-full animate-spin" />
-                            <span>Restoring Snapshot...</span>
-                          </>
-                        ) : (
-                          <>
-                            <RotateCcw className="w-3.5 h-3.5 text-brand-emerald" />
-                            <span>Roll Back to {ver.label}</span>
-                          </>
-                        )}
-                      </button>
-                    )}
-                  </div>
-                </div>
-
-                {/* Metadata Details & Composition */}
-                <div className="mt-4 pt-4 border-t border-white/5 grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs font-mono">
-                  <div className="p-2.5 rounded-lg bg-void/50 border border-white/5">
-                    <span className="text-zinc-500 text-[10px]">SEED CORPUS</span>
-                    <div className="text-zinc-200 mt-0.5">{meta.seed_count || 15} examples</div>
-                  </div>
-                  <div className="p-2.5 rounded-lg bg-void/50 border border-white/5">
-                    <span className="text-zinc-500 text-[10px]">TRAINED FEEDBACK</span>
-                    <div className="text-zinc-200 mt-0.5">{meta.trained_feedback_count || 0} corrections</div>
-                  </div>
-                  <div className="p-2.5 rounded-lg bg-void/50 border border-white/5">
-                    <span className="text-zinc-500 text-[10px]">SERIALIZATION</span>
-                    <div className="text-brand-emerald mt-0.5">IBL1 Binary Float64</div>
-                  </div>
-                  <div className="p-2.5 rounded-lg bg-void/50 border border-white/5">
-                    <span className="text-zinc-500 text-[10px]">RECIPE VERSION</span>
-                    <div className="text-zinc-400 mt-0.5 truncate">{meta.recipe_version || 'sgd-feedback-v1'}</div>
-                  </div>
-                </div>
-              </motion.div>
-            );
-          })}
+      {loadError && (
+        <div className="workspace-inline-error" role="alert">
+          <span><strong>Version history unavailable.</strong> {loadError}</span>
+          <button type="button" onClick={loadVersions} disabled={isLoading}>{isLoading ? 'Retrying…' : 'Retry'}</button>
         </div>
       )}
+
+      {/* Ledger Table Container */}
+      <div className="bg-paper-sheet border border-paper-border shadow-paper overflow-hidden">
+        <div className="px-4 py-2.5 bg-paper-subtle border-b-2 border-ink flex items-center justify-between text-[11px] font-mono uppercase tracking-wider text-ink font-semibold">
+          <span>Snapshot Version History ({versions.length})</span>
+          <span className="text-[10px] text-ink-faint lowercase tracking-normal">click to roll back</span>
+        </div>
+
+        {isLoading && <div className="workspace-empty-state" role="status">Loading saved model versions…</div>}
+        {!isLoading && loadError && versions.length === 0 && <div className="workspace-empty-state">Version history could not be reached.</div>}
+        {!isLoading && !loadError && versions.length === 0 && <div className="workspace-empty-state">No saved model versions are available yet.</div>}
+        {versions.length > 0 && <div className="overflow-x-auto">
+          <table className="w-full text-left text-xs editorial-table">
+            <thead className="bg-paper-subtle">
+              <tr>
+                <th className="p-3">Version</th>
+                <th className="p-3">Status</th>
+                <th className="p-3">Training Mode</th>
+                <th className="p-3">Composition</th>
+                <th className="p-3">Created</th>
+                <th className="p-3">Evaluation Record</th>
+                <th className="p-3 text-right">Action</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-paper-border bg-paper-sheet">
+              {versions.map((ver) => {
+                const isActive = Boolean(ver.is_active);
+                const isRolling = rollingBackId === ver.id;
+
+                return (
+                  <tr key={ver.id} className={isActive ? 'bg-[#fcfaf7]' : ''}>
+                    {/* Version Label */}
+                    <td className="p-3 font-mono">
+                      <div className="flex items-center gap-2">
+                        <strong className="text-sm font-bold text-ink">{ver.label}</strong>
+                        <span className="text-[10px] text-ink-muted capitalize">({ver.kind})</span>
+                      </div>
+                    </td>
+
+                    {/* Status Badge */}
+                    <td className="p-3 font-mono text-[11px]">
+                      {isActive ? (
+                        <span className="inline-flex items-center gap-1.5 px-2 py-0.5 bg-emerald-100 text-emerald-900 border border-emerald-300 font-bold uppercase">
+                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-700" />
+                          <span>Active Pointer</span>
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center px-2 py-0.5 bg-paper-subtle text-ink-muted border border-paper-border uppercase">
+                          <span>Inactive Snapshot</span>
+                        </span>
+                      )}
+                    </td>
+
+                    {/* Training Mode */}
+                    <td className="p-3 font-mono text-ink">
+                      <span>{ver.metadata?.training_mode || 'seed'}</span>
+                    </td>
+
+                    {/* Composition */}
+                    <td className="p-3 font-mono text-ink-muted">
+                      <span>{ver.metadata?.seed_count ?? 15} seed · {ver.metadata?.feedback_count ?? 0} feedback</span>
+                    </td>
+
+                    {/* Timestamp */}
+                    <td className="p-3 font-mono text-[11px] text-ink-faint">
+                      <span>{ver.created_at ? new Date(ver.created_at).toLocaleString() : '—'}</span>
+                    </td>
+
+                    {/* Evaluation Summary */}
+                    <td className="p-3 font-mono text-[11px]">
+                      {ver.evaluation_summary ? (
+                        <div className="text-ink">
+                          <span>Cat: {(ver.evaluation_summary.category_accuracy * 100).toFixed(0)}%</span>
+                          <span className="text-paper-border mx-1">·</span>
+                          <span>Pri: {(ver.evaluation_summary.priority_accuracy * 100).toFixed(0)}%</span>
+                        </div>
+                      ) : (
+                        <span className="text-ink-faint italic">No evaluation logged</span>
+                      )}
+                    </td>
+
+                    {/* Action */}
+                    <td className="p-3 text-right">
+                      {isActive ? (
+                        <span className="inline-flex items-center gap-1 text-[11px] font-mono text-emerald-800 font-semibold">
+                          <Check className="w-3.5 h-3.5" />
+                          <span>Active</span>
+                        </span>
+                      ) : (
+                        <button
+                          onClick={() => handleRollback(ver.id)}
+                          disabled={isRolling}
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-paper-canvas hover:bg-paper-subtle border border-paper-border text-ink text-xs font-sans font-medium transition-colors cursor-pointer shadow-paper-sm disabled:opacity-50"
+                        >
+                          <RotateCcw className={`w-3 h-3 text-rust ${isRolling ? 'animate-spin' : ''}`} />
+                          <span>{isRolling ? 'Restoring...' : 'Roll Back to this Version'}</span>
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>}
+      </div>
+
     </div>
   );
 };

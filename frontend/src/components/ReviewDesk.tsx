@@ -1,33 +1,51 @@
-import React, { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'motion/react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
-  CheckSquare, 
-  Filter, 
-  ArrowUpDown, 
-  Download, 
-  Check, 
+  Inbox, 
   AlertCircle, 
-  Clock, 
-  UserCheck, 
+  CheckCircle2, 
+  Edit3, 
+  ArrowUpDown, 
+  Filter, 
+  Download, 
+  Upload,
+  FileText, 
   Calendar, 
+  DollarSign, 
   Tag, 
-  ChevronDown 
+  Check, 
+  ChevronRight, 
+  ArrowLeft,
+  RefreshCw,
+  Sparkles,
+  Info
 } from 'lucide-react';
-import { api, EmailRow } from '../api/client';
+import { api, EmailRow, StatusResponse } from '../api/client';
 
-export const ReviewDesk: React.FC<{ onFeedbackSaved?: () => void }> = ({ onFeedbackSaved }) => {
+interface ReviewDeskProps {
+  onFeedbackSaved?: () => void;
+  status?: StatusResponse | null;
+}
+
+export const ReviewDesk: React.FC<ReviewDeskProps> = ({ onFeedbackSaved, status }) => {
   const [emails, setEmails] = useState<EmailRow[]>([]);
+  const [selectedEmailId, setSelectedEmailId] = useState<number | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [categoryFilter, setCategoryFilter] = useState('All categories');
   const [priorityFilter, setPriorityFilter] = useState('All priorities');
   const [order, setOrder] = useState('Lowest confidence first');
-  const [unresolvedOnly, setUnresolvedOnly] = useState(false);
-  const [savingId, setSavingId] = useState<number | null>(null);
-  const [saveSuccessId, setSaveSuccessId] = useState<number | null>(null);
-  const [expandedHeaders, setExpandedHeaders] = useState<Record<number, boolean>>({});
-
-  // Local draft corrections state
+  const [queueView, setQueueView] = useState<'all' | 'review' | 'resolved'>('all');
+  
+  // Feedback draft and save state
   const [drafts, setDrafts] = useState<Record<number, { category: string; priority: string }>>({});
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveSuccessNotice, setSaveSuccessNotice] = useState<string | null>(null);
+  const [saveErrorNotice, setSaveErrorNotice] = useState<string | null>(null);
+  const [demoNotice, setDemoNotice] = useState<string | null>(null);
+
+  // Mobile view state: list vs detail
+  const [mobileDetailOpen, setMobileDetailOpen] = useState(false);
+  const uploadInputRef = useRef<HTMLInputElement>(null);
 
   const loadEmails = async () => {
     setIsLoading(true);
@@ -37,20 +55,37 @@ export const ReviewDesk: React.FC<{ onFeedbackSaved?: () => void }> = ({ onFeedb
         order,
         category: categoryFilter,
         priority: priorityFilter,
-        unresolved: unresolvedOnly,
+        unresolved: queueView === 'review',
       });
-      setEmails(res.rows);
-      // Initialize drafts
+      setLoadError(null);
+      const visibleRows = queueView === 'review'
+        ? res.rows.filter((row) => row.status === 'needs_review' && !row.feedback_id)
+        : queueView === 'resolved'
+          ? res.rows.filter((row) => row.status !== 'needs_review' || Boolean(row.feedback_id))
+          : res.rows;
+      setEmails(visibleRows);
+
+      // Initialize drafts for each row
       const initialDrafts: Record<number, { category: string; priority: string }> = {};
-      res.rows.forEach((r) => {
+      visibleRows.forEach((r) => {
         initialDrafts[r.id] = {
           category: r.effective_category,
           priority: r.effective_priority,
         };
       });
       setDrafts(initialDrafts);
+
+      // Auto-select first email if none selected or if selected is no longer in list
+      if (visibleRows.length > 0) {
+        if (!selectedEmailId || !visibleRows.some((r) => r.id === selectedEmailId)) {
+          setSelectedEmailId(visibleRows[0].id);
+        }
+      } else {
+        setSelectedEmailId(null);
+      }
     } catch (err) {
       console.error('Failed to load inbox emails', err);
+      setLoadError(err instanceof Error ? err.message : 'Inbox could not be loaded.');
     } finally {
       setIsLoading(false);
     }
@@ -58,16 +93,37 @@ export const ReviewDesk: React.FC<{ onFeedbackSaved?: () => void }> = ({ onFeedb
 
   useEffect(() => {
     loadEmails();
-  }, [categoryFilter, priorityFilter, order, unresolvedOnly]);
+  }, [categoryFilter, priorityFilter, order, queueView]);
 
   const handleImportDemo = async () => {
     setIsLoading(true);
+    setDemoNotice(null);
     try {
-      await api.importDemo('demo_feedback.csv');
+      const res = await api.importDemo('demo_feedback.csv');
+      setDemoNotice(`Successfully imported ${res.imported} demo emails (${res.duplicates} duplicates skipped).`);
       await loadEmails();
       if (onFeedbackSaved) onFeedbackSaved();
+    } catch (err: any) {
+      setDemoNotice(`Import failed: ${err.message}`);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleUploadFile = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file) return;
+    setIsLoading(true);
+    setDemoNotice(null);
+    try {
+      const res = await api.uploadEmailFile(file);
+      const { result } = res;
+      setDemoNotice(`Imported ${result.new} new ${result.new === 1 ? 'message' : 'messages'} from ${file.name}; ${result.duplicates} duplicate${result.duplicates === 1 ? '' : 's'} skipped${result.warnings ? `, ${result.warnings} parser warning${result.warnings === 1 ? '' : 's'}` : ''}.`);
+      await loadEmails();
+      onFeedbackSaved?.();
     } catch (err) {
-      console.error('Failed to import demonstration sample', err);
+      setDemoNotice(`Import failed: ${err instanceof Error ? err.message : 'The file could not be imported.'}`);
     } finally {
       setIsLoading(false);
     }
@@ -76,314 +132,572 @@ export const ReviewDesk: React.FC<{ onFeedbackSaved?: () => void }> = ({ onFeedb
   const handleSaveCorrection = async (emailId: number) => {
     const draft = drafts[emailId];
     if (!draft) return;
-    setSavingId(emailId);
+    setIsSaving(true);
+    setSaveSuccessNotice(null);
+    setSaveErrorNotice(null);
     try {
-      await api.saveFeedback(emailId, draft.category, draft.priority);
-      setSaveSuccessId(emailId);
-      setTimeout(() => setSaveSuccessId(null), 2500);
+      const res = await api.saveFeedback(emailId, draft.category, draft.priority);
+      const isRev = res.is_revision ? 'Revision updated' : 'Correction saved';
+      setSaveSuccessNotice(`${isRev} for message #${emailId}. Stored in feedback ledger for candidate training.`);
       await loadEmails();
       if (onFeedbackSaved) onFeedbackSaved();
-    } catch (err) {
+    } catch (err: any) {
       console.error('Failed to save correction', err);
+      setSaveErrorNotice(err.message || 'Correction could not be saved.');
     } finally {
-      setSavingId(null);
+      setIsSaving(false);
     }
   };
 
-  const toggleHeader = (id: number) => {
-    setExpandedHeaders((prev) => ({ ...prev, [id]: !prev[id] }));
-  };
+  const selectedEmail = emails.find((e) => e.id === selectedEmailId) || null;
+  const currentDraft = selectedEmailId ? drafts[selectedEmailId] : null;
+
+  const categories = status?.categories || ['job opportunities', 'university', 'bills', 'promotions', 'spam'];
+  const priorities = status?.priorities || ['high', 'normal', 'low'];
 
   return (
-    <div className="space-y-8 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      {/* Header and Controls */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-white/10 pb-6">
+    <div className="workspace-review-desk space-y-6 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+      
+      {/* Editorial Section Header */}
+      <div className="workspace-review-heading flex flex-col md:flex-row md:items-end justify-between gap-4 pb-4 border-b border-paper-border">
         <div>
-          <div className="flex items-center gap-2 mb-2">
-            <span className="w-2 h-2 rounded-full bg-brand-cyan animate-pulse" />
-            <span className="font-mono text-xs text-brand-cyan uppercase tracking-wider">
-              HUMAN-IN-THE-LOOP TRIAGE DESK
+          <div className="flex items-center gap-2 mb-1">
+            <span className="font-mono text-[10px] tracking-wider uppercase text-rust font-semibold">
+            01 / INBOX
+            </span>
+            <span className="text-paper-border">·</span>
+            <span className="font-mono text-[10px] text-ink-muted">
+            EMAIL TRIAGE · HUMAN REVIEW
             </span>
           </div>
-          <h2 className="text-2xl sm:text-3xl font-bold text-white tracking-tight">
-            Review Queue & Correction Desk
+          <h2 className="font-serif text-2xl sm:text-3xl font-bold text-ink">
+            Inbox &amp; Review
           </h2>
-          <p className="text-sm text-zinc-400 mt-1">
-            Low-confidence predictions routed for human verification. Approved corrections train candidate models.
+          <p className="text-xs text-ink-muted mt-1 max-w-2xl leading-relaxed">
+            Scan model suggestions, check uncertain messages, and record the labels you want the next candidate to learn from.
           </p>
         </div>
 
-        <div className="flex items-center gap-3">
+        {/* Global Action Buttons */}
+        <div className="flex flex-wrap items-center gap-2.5">
+          <input
+            ref={uploadInputRef}
+            className="sr-only"
+            type="file"
+            accept=".eml,.mbox,.csv,message/rfc822,text/csv"
+            aria-label="Choose email file to import"
+            onChange={handleUploadFile}
+          />
+          <button
+            type="button"
+            onClick={() => uploadInputRef.current?.click()}
+            disabled={isLoading}
+            className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-sans font-medium bg-paper-sheet hover:bg-paper-subtle border border-paper-border text-ink shadow-paper-sm transition-colors cursor-pointer disabled:opacity-50"
+          >
+            <Upload className="w-3.5 h-3.5 text-rust" />
+            <span>Import email file</span>
+          </button>
           <button
             onClick={handleImportDemo}
             disabled={isLoading}
-            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-surface-subtle hover:bg-surface-highlight border border-white/10 text-white font-mono text-xs hover:border-brand-cyan/40 transition-all cursor-pointer"
+            className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-sans font-medium bg-paper-sheet hover:bg-paper-subtle border border-paper-border text-ink shadow-paper-sm transition-colors cursor-pointer disabled:opacity-50"
           >
-            <Download className="w-3.5 h-3.5 text-brand-cyan" />
+            <RefreshCw className={`w-3.5 h-3.5 text-rust ${isLoading ? 'animate-spin' : ''}`} />
             <span>Load Demo Fixture (5 Emails)</span>
           </button>
+
+          <a
+            href="/api/export/csv"
+            download="inboxlearn_export.csv"
+            className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-sans font-medium bg-paper-sheet hover:bg-paper-subtle border border-paper-border text-ink shadow-paper-sm transition-colors cursor-pointer"
+          >
+            <Download className="w-3.5 h-3.5 text-ink-muted" />
+            <span>Export CSV</span>
+          </a>
         </div>
       </div>
 
-      {/* Filter and Sorting Toolbar */}
-      <div className="p-4 rounded-xl bg-surface/60 border border-white/5 flex flex-wrap items-center justify-between gap-4 backdrop-blur-md">
+      {/* Notifications */}
+      {demoNotice && (
+        <div className="p-3 bg-paper-sheet border-l-3 border-rust border-y border-r border-paper-border text-xs text-ink flex items-center justify-between shadow-paper-sm">
+          <div className="flex items-center gap-2">
+            <Info className="w-4 h-4 text-rust flex-shrink-0" />
+            <span>{demoNotice}</span>
+          </div>
+          <button onClick={() => setDemoNotice(null)} className="text-ink-muted hover:text-ink text-xs underline cursor-pointer">
+            Dismiss
+          </button>
+        </div>
+      )}
+
+      {saveSuccessNotice && (
+        <div className="p-3 bg-emerald-50 border-l-3 border-emerald-700 border-y border-r border-emerald-200 text-xs text-emerald-950 flex items-center justify-between shadow-paper-sm">
+          <div className="flex items-center gap-2">
+            <CheckCircle2 className="w-4 h-4 text-emerald-700 flex-shrink-0" />
+            <span>{saveSuccessNotice}</span>
+          </div>
+          <button onClick={() => setSaveSuccessNotice(null)} className="text-emerald-800 hover:text-emerald-950 text-xs underline cursor-pointer">
+            Dismiss
+          </button>
+        </div>
+      )}
+
+      {saveErrorNotice && (
+        <div className="workspace-inline-error" role="alert">
+          <span>{saveErrorNotice}</span>
+          <button onClick={() => setSaveErrorNotice(null)}>Dismiss</button>
+        </div>
+      )}
+
+      {loadError && (
+        <div className="workspace-inline-error" role="alert">
+          <span><strong>Inbox unavailable.</strong> {loadError}</span>
+          <button type="button" onClick={loadEmails} disabled={isLoading}>{isLoading ? 'Retrying…' : 'Retry'}</button>
+        </div>
+      )}
+
+      {/* Filter & Sort Bar */}
+      <div className="workspace-inbox-controls">
+        <div className="workspace-queue-tabs" role="group" aria-label="Filter messages by review status">
+          <button type="button" aria-pressed={queueView === 'all'} className={queueView === 'all' ? 'is-active' : ''} onClick={() => setQueueView('all')}>
+            All <span>{status?.metrics.emails_stored ?? '—'}</span>
+          </button>
+          <button type="button" aria-pressed={queueView === 'review'} className={queueView === 'review' ? 'is-active' : ''} onClick={() => setQueueView('review')}>
+            Needs review <span>{status?.metrics.pending_reviews ?? '—'}</span>
+          </button>
+          <button type="button" aria-pressed={queueView === 'resolved'} className={queueView === 'resolved' ? 'is-active' : ''} onClick={() => setQueueView('resolved')}>
+            Resolved <span>{status ? Math.max(0, status.metrics.emails_stored - status.metrics.pending_reviews) : '—'}</span>
+          </button>
+        </div>
+        <div className="workspace-inbox-filters">
         <div className="flex flex-wrap items-center gap-3">
+          {/* Order Selector */}
+          <div className="flex items-center gap-1.5">
+            <span className="text-ink-faint font-mono text-[11px]">ORDER:</span>
+            <select
+              value={order}
+              onChange={(e) => setOrder(e.target.value)}
+              className="bg-paper-canvas border border-paper-border px-2 py-1 text-xs text-ink focus:outline-none focus:border-rust"
+            >
+              <option value="Lowest confidence first">Lowest confidence first (Triage)</option>
+              <option value="Newest first">Most recent</option>
+            </select>
+          </div>
+
           {/* Category Filter */}
-          <div className="flex items-center gap-1.5 text-xs font-mono">
-            <Filter className="w-3.5 h-3.5 text-zinc-500" />
+          <div className="flex items-center gap-1.5">
+            <span className="text-ink-faint font-mono text-[11px]">CATEGORY:</span>
             <select
               value={categoryFilter}
               onChange={(e) => setCategoryFilter(e.target.value)}
-              className="bg-surface-elevated border border-white/10 rounded-lg px-3 py-1.5 text-zinc-200 text-xs focus:outline-none focus:border-brand-indigo font-mono cursor-pointer"
+              className="bg-paper-canvas border border-paper-border px-2 py-1 text-xs text-ink focus:outline-none focus:border-rust"
             >
               <option value="All categories">All categories</option>
-              <option value="job opportunities">job opportunities</option>
-              <option value="university">university</option>
-              <option value="bills">bills</option>
-              <option value="promotions">promotions</option>
-              <option value="spam">spam</option>
+              {categories.map((c) => (
+                <option key={c} value={c}>{c}</option>
+              ))}
             </select>
           </div>
 
           {/* Priority Filter */}
-          <div className="flex items-center gap-1.5 text-xs font-mono">
+          <div className="flex items-center gap-1.5">
+            <span className="text-ink-faint font-mono text-[11px]">PRIORITY:</span>
             <select
               value={priorityFilter}
               onChange={(e) => setPriorityFilter(e.target.value)}
-              className="bg-surface-elevated border border-white/10 rounded-lg px-3 py-1.5 text-zinc-200 text-xs focus:outline-none focus:border-brand-indigo font-mono cursor-pointer"
+              className="bg-paper-canvas border border-paper-border px-2 py-1 text-xs text-ink focus:outline-none focus:border-rust"
             >
               <option value="All priorities">All priorities</option>
-              <option value="low">low priority</option>
-              <option value="normal">normal priority</option>
-              <option value="high">high priority</option>
+              {priorities.map((p) => (
+                <option key={p} value={p}>{p}</option>
+              ))}
             </select>
           </div>
 
-          {/* Unresolved Checkbox */}
-          <label className="flex items-center gap-2 text-xs font-mono text-zinc-400 cursor-pointer select-none">
-            <input
-              type="checkbox"
-              checked={unresolvedOnly}
-              onChange={(e) => setUnresolvedOnly(e.target.checked)}
-              className="rounded bg-surface-elevated border-white/10 accent-brand-cyan text-brand-cyan focus:ring-0 cursor-pointer"
-            />
-            <span>Unresolved only</span>
-          </label>
         </div>
 
-        {/* Sorting Order */}
-        <div className="flex items-center gap-2 text-xs font-mono">
-          <ArrowUpDown className="w-3.5 h-3.5 text-zinc-500" />
-          <select
-            value={order}
-            onChange={(e) => setOrder(e.target.value)}
-            className="bg-surface-elevated border border-white/10 rounded-lg px-3 py-1.5 text-zinc-200 text-xs focus:outline-none focus:border-brand-indigo font-mono cursor-pointer"
-          >
-            <option value="Lowest confidence first">Lowest confidence first</option>
-            <option value="Newest first">Newest first</option>
-          </select>
+        <div className="workspace-inbox-count" aria-live="polite">
+          Showing <strong>{emails.length}</strong> message{emails.length === 1 ? '' : 's'}
+        </div>
         </div>
       </div>
 
-      {/* Email Cards List */}
-      {isLoading ? (
-        <div className="py-20 text-center flex flex-col items-center justify-center space-y-3">
-          <div className="w-8 h-8 border-2 border-brand-cyan/20 border-t-brand-cyan rounded-full animate-spin" />
-          <span className="text-xs font-mono text-zinc-400">Loading inbox message ledger...</span>
-        </div>
-      ) : emails.length === 0 ? (
-        <div className="p-16 rounded-2xl bg-surface/40 border border-dashed border-white/10 text-center space-y-4">
-          <div className="w-12 h-12 rounded-xl bg-brand-cyan/10 border border-brand-cyan/20 flex items-center justify-center text-brand-cyan mx-auto">
-            <CheckSquare className="w-6 h-6" />
-          </div>
-          <div className="space-y-1">
-            <h3 className="text-base font-semibold text-white">No Review Messages Matching Filter</h3>
-            <p className="text-xs text-zinc-400 max-w-sm mx-auto">
-              All messages are classified or have feedback saved. Click "Load Demo Fixture" above to import 5 synthetic messages.
-            </p>
-          </div>
-        </div>
-      ) : (
-        <div className="space-y-6">
-          {emails.map((row) => {
-            const draft = drafts[row.id] || { category: row.effective_category, priority: row.effective_priority };
-            const isModified =
-              draft.category !== row.predicted_category || draft.priority !== row.predicted_priority;
-            const isNeedsReview = row.status === 'needs_review' && !row.feedback_id;
+      {/* Main Two-Column Triage Console (Desktop & Mobile) */}
+      <div className="workspace-inbox-grid grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+        
+        {/* ========================================================================= */}
+        {/* LEFT COLUMN: EMAIL TRIAGE LIST TABLE (7 Cols on LG)                      */}
+        {/* ========================================================================= */}
+        <div className={`lg:col-span-6 space-y-3 ${mobileDetailOpen ? 'hidden lg:block' : 'block'}`}>
+          <div className="workspace-message-list">
+            
+            {/* Table Header Strip */}
+            <div className="workspace-message-list-heading">
+              <div className="flex items-center gap-2">
+                <span>Inbox Messages</span>
+                <span className="text-ink-muted font-normal">({emails.length})</span>
+              </div>
+              <span className="text-[10px] text-ink-faint lowercase tracking-normal">click to inspect & confirm</span>
+            </div>
 
-            return (
-              <motion.div
-                key={row.id}
-                layout
-                initial={{ opacity: 0, y: 15 }}
-                animate={{ opacity: 1, y: 0 }}
-                className={`rounded-2xl border p-6 backdrop-blur-xl transition-all ${
-                  isNeedsReview
-                    ? 'bg-surface/90 border-brand-amber/30 shadow-tactile'
-                    : 'bg-surface/60 border-white/5'
-                }`}
-              >
-                {/* Meta Header */}
-                <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/5 pb-4 mb-4">
-                  <div className="flex items-center gap-3">
-                    <span className="font-mono text-xs px-2.5 py-1 rounded bg-white/5 text-zinc-300 border border-white/5">
-                      MSG #{row.id}
-                    </span>
-                    
-                    <span className="font-mono text-xs text-zinc-500 uppercase">
-                      SOURCE: {row.source_type || 'CSV'}
-                    </span>
+            {/* Empty State */}
+            {isLoading && emails.length === 0 && (
+              <div className="workspace-empty-state" role="status">Loading messages from the local inbox…</div>
+            )}
 
-                    {row.date_header && (
-                      <span className="font-mono text-xs text-zinc-500 flex items-center gap-1">
-                        <Clock className="w-3 h-3" /> {row.date_header}
-                      </span>
-                    )}
-                  </div>
+            {emails.length === 0 && !isLoading && !loadError && (
+              <div className="p-8 text-center space-y-3">
+                <Inbox className="w-8 h-8 text-ink-faint mx-auto" />
+                <p className="font-serif text-lg text-ink font-semibold">No emails match the selected filters.</p>
+                <p className="text-xs text-ink-muted max-w-md mx-auto">
+                  {queueView === 'review'
+                    ? 'No uncertain messages are waiting for a human decision.'
+                    : queueView === 'resolved'
+                      ? 'No classified or corrected messages in this view yet.'
+                      : 'Your inbox currently has no imported messages.'}
+                </p>
+                <button
+                  onClick={handleImportDemo}
+                  className="mt-2 inline-flex items-center gap-2 px-4 py-2 text-xs font-sans font-medium bg-rust text-white hover:bg-rust-hover transition-colors cursor-pointer"
+                >
+                  <RefreshCw className="w-3.5 h-3.5" />
+                  <span>Load Demo Fixture (5 Synthetic Emails)</span>
+                </button>
+              </div>
+            )}
 
-                  <div className="flex items-center gap-2">
-                    {row.status === 'needs_review' && !row.feedback_id && (
-                      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-mono bg-brand-amber/15 text-brand-amber border border-brand-amber/30">
-                        <AlertCircle className="w-3 h-3" />
-                        NEEDS REVIEW
-                      </span>
-                    )}
-                    {row.feedback_id && (
-                      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-mono bg-brand-indigo/15 text-brand-indigo border border-brand-indigo/30">
-                        <UserCheck className="w-3 h-3" />
-                        FEEDBACK RECORDED
-                      </span>
-                    )}
-                    {row.status === 'classified' && !row.feedback_id && (
-                      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-mono bg-brand-emerald/15 text-brand-emerald border border-brand-emerald/30">
-                        <Check className="w-3 h-3" />
-                        AUTO-CLASSIFIED
-                      </span>
-                    )}
-                  </div>
-                </div>
+            {/* Email Rows */}
+            <div className="divide-y divide-paper-border max-h-[640px] overflow-y-auto">
+              {emails.map((email) => {
+                const isSelected = email.id === selectedEmailId;
+                const isNeedsReview = email.status === 'needs_review';
+                const isCorrected = email.status === 'corrected';
 
-                {/* Email Body Content */}
-                <div className="space-y-2 mb-6">
-                  <h4 className="text-base font-semibold text-white tracking-tight">
-                    {row.subject}
-                  </h4>
-                  <div className="text-xs text-zinc-400 font-mono">
-                    From: <span className="text-zinc-300">{row.sender || 'Not supplied'}</span>
-                  </div>
-                  <p className="text-sm text-zinc-300 leading-relaxed font-sans bg-void/50 p-4 rounded-xl border border-white/5 select-text">
-                    {row.body}
-                  </p>
-                </div>
+                return (
+                  <div
+                    key={email.id}
+                    onClick={() => {
+                      setSelectedEmailId(email.id);
+                      setMobileDetailOpen(true);
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        setSelectedEmailId(email.id);
+                        setMobileDetailOpen(true);
+                      }
+                    }}
+                    tabIndex={0}
+                    role="button"
+                    aria-pressed={isSelected}
+                    className={`workspace-message-row p-3.5 text-left transition-colors cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-rust ${
+                      isSelected
+                        ? 'bg-paper-canvas border-l-4 border-l-rust border-y border-y-paper-border'
+                        : 'hover:bg-[#fbfaf8] border-l-4 border-l-transparent'
+                    }`}
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      {/* Left: Status tag + ID */}
+                      <div className="flex items-center gap-2 flex-wrap">
+                        {isNeedsReview && (
+                          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-mono font-bold uppercase bg-amber-100 text-amber-900 border border-amber-300">
+                            <AlertCircle className="w-3 h-3 text-amber-700" />
+                            <span>Needs Review</span>
+                          </span>
+                        )}
+                        {isCorrected && (
+                          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-mono font-bold uppercase bg-emerald-100 text-emerald-900 border border-emerald-300">
+                            <CheckCircle2 className="w-3 h-3 text-emerald-700" />
+                            <span>Corrected</span>
+                          </span>
+                        )}
+                        {!isNeedsReview && !isCorrected && (
+                          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-mono uppercase bg-paper-subtle text-ink-muted border border-paper-border">
+                            <span>Classified</span>
+                          </span>
+                        )}
 
-                {/* Extracted Entities */}
-                {row.entities && row.entities.length > 0 && (
-                  <div className="mb-6 flex flex-wrap gap-2">
-                    {row.entities.map((e, idx) => (
-                      <div
-                        key={idx}
-                        className="px-2 py-0.5 rounded bg-surface-subtle border border-white/5 text-[11px] font-mono text-zinc-300 flex items-center gap-1"
-                      >
-                        <Tag className="w-3 h-3 text-brand-cyan" />
-                        <span className="text-brand-cyan capitalize">{e.type}:</span>
-                        <span>{e.value}</span>
+                        <span className="font-mono text-[10px] text-ink-faint">
+                          #{email.id}
+                        </span>
                       </div>
+
+                      {/* Right: Confidence Score Indicators */}
+                      <div className="workspace-row-confidence flex items-center gap-2 text-[11px] font-mono text-ink-muted">
+                        <span>
+                          Cat: <strong className={email.category_confidence < 0.70 ? 'text-amber-800' : 'text-ink'}>
+                            {(email.category_confidence * 100).toFixed(0)}%
+                          </strong>
+                        </span>
+                        <span className="text-paper-border">·</span>
+                        <span>
+                          Pri: <strong className={email.priority_confidence < 0.70 ? 'text-amber-800' : 'text-ink'}>
+                            {(email.priority_confidence * 100).toFixed(0)}%
+                          </strong>
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="workspace-confidence-meter" aria-hidden="true">
+                      <i><b style={{ width: `${Math.max(0, Math.min(100, email.category_confidence * 100))}%` }} /></i>
+                      <i><b style={{ width: `${Math.max(0, Math.min(100, email.priority_confidence * 100))}%` }} /></i>
+                    </div>
+
+                    {/* Subject Line */}
+                    <div className="mt-1.5 font-sans font-semibold text-sm text-ink line-clamp-1">
+                      {email.subject}
+                    </div>
+
+                    {/* Sender & Preview snippet */}
+                    <div className="mt-0.5 flex items-center justify-between text-xs text-ink-muted">
+                      <span className="truncate max-w-[280px]">From: {email.sender || 'unknown'}</span>
+                      <span className="text-[10px] font-mono uppercase text-ink-faint">{email.source}</span>
+                    </div>
+
+                    {/* Model Suggestions / Current Labels */}
+                    <div className="mt-2.5 pt-2 border-t border-dashed border-paper-border flex flex-wrap items-center justify-between gap-2 text-xs">
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-[10px] font-mono uppercase text-ink-faint">Label:</span>
+                        <span className="px-1.5 py-0.5 bg-paper-sheet border border-paper-border font-mono text-[11px] text-ink font-medium">
+                          {email.effective_category}
+                        </span>
+                        <span className="px-1.5 py-0.5 bg-paper-sheet border border-paper-border font-mono text-[11px] text-ink font-medium">
+                          {email.effective_priority}
+                        </span>
+                      </div>
+
+                      <div className="text-[11px] text-rust flex items-center gap-1 font-sans">
+                        <span>Inspect & confirm</span>
+                        <ChevronRight className="w-3 h-3" />
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+
+        {/* ========================================================================= */}
+        {/* RIGHT COLUMN: READING PANE & HUMAN CONFIRMATION DESK (5 Cols on LG)      */}
+        {/* ========================================================================= */}
+        <div className={`lg:col-span-6 space-y-4 ${mobileDetailOpen ? 'block' : 'hidden lg:block'}`}>
+          {selectedEmail ? (
+            <div className="workspace-reading-pane bg-paper-sheet border border-paper-border shadow-paper p-5 space-y-5">
+              
+              {/* Mobile Back Button */}
+              <div className="lg:hidden pb-3 border-b border-paper-border">
+                <button
+                  onClick={() => setMobileDetailOpen(false)}
+                  className="inline-flex items-center gap-1 text-xs font-mono text-rust hover:underline cursor-pointer"
+                >
+                  <ArrowLeft className="w-3.5 h-3.5" />
+                  <span>Back to Message List</span>
+                </button>
+              </div>
+
+              {/* Message Header & Meta */}
+              <div className="workspace-message-meta space-y-2 pb-4 border-b border-paper-border">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="font-mono text-xs text-ink-muted">
+                    MESSAGE #{selectedEmail.id}
+                  </span>
+                  
+                  {/* Status Badge */}
+                  {selectedEmail.status === 'needs_review' && (
+                    <span className="px-2 py-0.5 bg-amber-100 text-amber-900 border border-amber-300 font-mono text-[10px] font-bold uppercase">
+                      Needs Review
+                    </span>
+                  )}
+                  {selectedEmail.status === 'corrected' && (
+                    <span className="px-2 py-0.5 bg-emerald-100 text-emerald-900 border border-emerald-300 font-mono text-[10px] font-bold uppercase">
+                      Human Feedback Saved
+                    </span>
+                  )}
+                  {selectedEmail.status === 'classified' && (
+                    <span className="px-2 py-0.5 bg-paper-subtle text-ink-muted border border-paper-border font-mono text-[10px] uppercase">
+                      Model Confident
+                    </span>
+                  )}
+                </div>
+
+                <h3 className="font-serif text-xl sm:text-2xl font-bold text-ink leading-snug">
+                  {selectedEmail.subject}
+                </h3>
+
+                <div className="text-xs text-ink-muted space-y-0.5 font-sans pt-1">
+                  <div>
+                    <span className="font-semibold text-ink">From:</span> {selectedEmail.sender || 'Unknown Sender'}
+                  </div>
+                  {selectedEmail.date_header && (
+                    <div>
+                      <span className="font-semibold text-ink">Date:</span> {selectedEmail.date_header}
+                    </div>
+                  )}
+                  <div>
+                    <span className="font-semibold text-ink">Source:</span> {selectedEmail.source} ({selectedEmail.source_type})
+                  </div>
+                </div>
+              </div>
+
+              {/* Email Body Content */}
+              <div className="workspace-message-body space-y-2">
+                <span className="text-[10px] font-mono uppercase text-ink-faint block">
+                  Email Body Content
+                </span>
+                <div className="workspace-message-copy p-3.5 bg-paper-canvas border border-paper-border text-xs sm:text-sm text-ink-light font-sans whitespace-pre-wrap leading-relaxed select-text max-h-60 overflow-y-auto">
+                  {selectedEmail.body}
+                </div>
+              </div>
+
+              {/* Extracted Entities (Dates, Money, Calendar) */}
+              {selectedEmail.entities && selectedEmail.entities.length > 0 && (
+                <div className="workspace-extracted-entities p-3 bg-paper-subtle border border-paper-border space-y-1.5 text-xs">
+                  <span className="text-[10px] font-mono uppercase text-ink font-semibold flex items-center gap-1.5">
+                    <Tag className="w-3 h-3 text-rust" />
+                    <span>Extracted Entities</span>
+                  </span>
+                  <div className="flex flex-wrap gap-1.5 pt-1">
+                    {selectedEmail.entities.map((ent, idx) => (
+                      <span
+                        key={idx}
+                        className="px-2 py-0.5 bg-paper-sheet border border-paper-border font-mono text-[11px] text-ink"
+                      >
+                        <strong className="text-rust">{ent.type}:</strong> {ent.value}
+                      </span>
                     ))}
                   </div>
-                )}
+                </div>
+              )}
 
-                {/* Prediction vs Correction Form */}
-                <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-center p-4 rounded-xl bg-surface-elevated/70 border border-white/5">
-                  {/* Left: Original Model Inference */}
-                  <div className="md:col-span-5 space-y-1">
-                    <div className="text-[11px] font-mono text-zinc-500 uppercase tracking-wider">
-                      ORIGINAL PREDICTION (MODEL v{row.model_version_id})
-                    </div>
-                    <div className="text-sm font-semibold text-zinc-200 capitalize">
-                      {row.predicted_category} · {row.predicted_priority} priority
-                    </div>
-                    <div className="text-xs font-mono text-zinc-500">
-                      Category {(row.category_confidence * 100).toFixed(1)}% · Priority{' '}
-                      {(row.priority_confidence * 100).toFixed(1)}%
-                    </div>
+              {/* Model Suggestion Rationale */}
+              <div className="workspace-model-suggestion p-3 bg-paper-canvas border border-paper-border text-xs space-y-1.5">
+                <div className="flex items-center justify-between text-[11px] font-mono">
+                  <span className="text-ink-muted">MODEL SUGGESTIONS · VERSION #{selectedEmail.model_version_id}</span>
+                  <span className="text-ink-faint">review thresholds {status ? `${Math.round(status.thresholds.category * 100)}% / ${Math.round(status.thresholds.priority * 100)}%` : 'set by local API'}</span>
+                </div>
+                <div className="grid grid-cols-2 gap-2 text-xs font-sans">
+                  <div>
+                    <span className="text-ink-faint text-[10px] block">CATEGORY:</span>
+                    <strong className="font-mono text-ink">{selectedEmail.predicted_category}</strong>
+                    <span className={`block font-mono text-[11px] ${selectedEmail.category_confidence < 0.70 ? 'text-amber-800 font-bold' : 'text-ink-muted'}`}>
+                      {(selectedEmail.category_confidence * 100).toFixed(1)}% confidence
+                    </span>
                   </div>
+                  <div>
+                    <span className="text-ink-faint text-[10px] block">PRIORITY:</span>
+                    <strong className="font-mono text-ink">{selectedEmail.predicted_priority}</strong>
+                    <span className={`block font-mono text-[11px] ${selectedEmail.priority_confidence < 0.70 ? 'text-amber-800 font-bold' : 'text-ink-muted'}`}>
+                      {(selectedEmail.priority_confidence * 100).toFixed(1)}% confidence
+                    </span>
+                  </div>
+                </div>
+                {selectedEmail.routing_reason && (
+                  <p className="text-[11px] text-ink-muted pt-1 border-t border-paper-border italic">
+                    Reason: {selectedEmail.routing_reason}
+                  </p>
+                )}
+              </div>
 
-                  {/* Right: Human Operator Correction Controls */}
-                  <div className="md:col-span-7 flex flex-wrap items-center justify-end gap-3">
-                    {/* Category Selector */}
-                    <div className="flex items-center gap-1.5">
-                      <span className="text-xs font-mono text-zinc-500">Correct:</span>
-                      <select
-                        value={draft.category}
-                        onChange={(e) =>
-                          setDrafts((prev) => ({
-                            ...prev,
-                            [row.id]: { ...draft, category: e.target.value },
-                          }))
-                        }
-                        className="bg-surface border border-white/10 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-brand-cyan font-mono cursor-pointer"
-                      >
-                        <option value="job opportunities">job opportunities</option>
-                        <option value="university">university</option>
-                        <option value="bills">bills</option>
-                        <option value="promotions">promotions</option>
-                        <option value="spam">spam</option>
-                      </select>
-                    </div>
+              {/* ================================================================= */}
+              {/* HUMAN CONFIRMATION & FEEDBACK DESK CONTROLS                      */}
+              {/* ================================================================= */}
+              <div className="workspace-correction-panel p-4 bg-paper-subtle border-2 border-ink space-y-3.5">
+                <div className="flex items-center justify-between pb-2 border-b border-paper-border">
+                  <span className="font-serif text-sm font-bold text-ink">
+                    Human Confirmation Desk
+                  </span>
+                  <span className="text-[10px] font-mono text-rust uppercase font-semibold">
+                    {selectedEmail.status === 'corrected' ? 'Revising Feedback' : 'Confirming Label'}
+                  </span>
+                </div>
 
-                    {/* Priority Selector */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {/* Category Selection */}
+                  <div className="space-y-1">
+                    <label htmlFor={`category-${selectedEmail.id}`} className="text-[10px] font-mono uppercase text-ink-muted block font-semibold">
+                      Confirmed Category:
+                    </label>
                     <select
-                      value={draft.priority}
-                      onChange={(e) =>
+                      id={`category-${selectedEmail.id}`}
+                      value={currentDraft?.category || selectedEmail.effective_category}
+                      onChange={(e) => {
+                        const val = e.target.value;
                         setDrafts((prev) => ({
                           ...prev,
-                          [row.id]: { ...draft, priority: e.target.value },
-                        }))
-                      }
-                      className="bg-surface border border-white/10 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-brand-cyan font-mono cursor-pointer"
+                          [selectedEmail.id]: {
+                            ...prev[selectedEmail.id],
+                            category: val,
+                            priority: prev[selectedEmail.id]?.priority || selectedEmail.effective_priority,
+                          },
+                        }));
+                      }}
+                      className="w-full bg-paper-sheet border border-paper-border px-2.5 py-1.5 text-xs text-ink focus:outline-none focus:border-rust"
                     >
-                      <option value="low">low priority</option>
-                      <option value="normal">normal priority</option>
-                      <option value="high">high priority</option>
+                      {categories.map((c) => (
+                        <option key={c} value={c}>{c}</option>
+                      ))}
                     </select>
+                  </div>
 
-                    {/* Commit Feedback Button */}
-                    <button
-                      onClick={() => handleSaveCorrection(row.id)}
-                      disabled={savingId === row.id}
-                      className="flex items-center gap-1.5 px-4 py-1.5 rounded-lg bg-brand-cyan/20 hover:bg-brand-cyan/30 border border-brand-cyan/40 text-brand-cyan text-xs font-mono font-semibold transition-all shadow-glow-cyan disabled:opacity-50 cursor-pointer"
+                  {/* Priority Selection */}
+                  <div className="space-y-1">
+                    <label htmlFor={`priority-${selectedEmail.id}`} className="text-[10px] font-mono uppercase text-ink-muted block font-semibold">
+                      Confirmed Priority:
+                    </label>
+                    <select
+                      id={`priority-${selectedEmail.id}`}
+                      value={currentDraft?.priority || selectedEmail.effective_priority}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setDrafts((prev) => ({
+                          ...prev,
+                          [selectedEmail.id]: {
+                            ...prev[selectedEmail.id],
+                            priority: val,
+                            category: prev[selectedEmail.id]?.category || selectedEmail.effective_category,
+                          },
+                        }));
+                      }}
+                      className="w-full bg-paper-sheet border border-paper-border px-2.5 py-1.5 text-xs text-ink focus:outline-none focus:border-rust"
                     >
-                      {savingId === row.id ? (
-                        <>
-                          <span className="w-3 h-3 border border-brand-cyan/30 border-t-brand-cyan rounded-full animate-spin" />
-                          <span>Saving...</span>
-                        </>
-                      ) : saveSuccessId === row.id ? (
-                        <>
-                          <Check className="w-3.5 h-3.5 text-brand-emerald" />
-                          <span className="text-brand-emerald">Feedback Saved!</span>
-                        </>
-                      ) : (
-                        <>
-                          <CheckSquare className="w-3.5 h-3.5" />
-                          <span>Save Feedback</span>
-                        </>
-                      )}
-                    </button>
+                      {priorities.map((p) => (
+                        <option key={p} value={p}>{p}</option>
+                      ))}
+                    </select>
                   </div>
                 </div>
 
-                {/* Routing Reason */}
-                {row.routing_reason && (
-                  <div className="mt-3 text-[11px] font-mono text-zinc-500">
-                    ℹ️ {row.routing_reason}
-                  </div>
-                )}
-              </motion.div>
-            );
-          })}
+                {/* Save Feedback Action Button */}
+                <div className="pt-1">
+                  <button
+                    onClick={() => handleSaveCorrection(selectedEmail.id)}
+                    disabled={isSaving}
+                    className="w-full py-2.5 px-4 text-xs font-sans font-semibold text-white bg-rust hover:bg-rust-hover transition-colors flex items-center justify-center gap-2 cursor-pointer shadow-paper-sm disabled:opacity-50"
+                  >
+                    <Check className="w-4 h-4" />
+                    <span>
+                      {isSaving ? 'Saving to Feedback Ledger...' : 'Save Human Correction to Feedback Ledger'}
+                    </span>
+                  </button>
+                  <p className="text-[10px] text-ink-faint text-center mt-1.5">
+                    Saved corrections record immutable feedback in SQLite. Candidate models are prepared in Stage 02.
+                  </p>
+                </div>
+              </div>
+
+            </div>
+          ) : (
+            <div className="p-8 bg-paper-sheet border border-paper-border text-center space-y-2 text-ink-muted">
+              <FileText className="w-8 h-8 text-ink-faint mx-auto" />
+              <p className="font-serif text-base font-semibold text-ink">No email selected</p>
+              <p className="text-xs">Select an email from the left triage list to read and confirm its labels.</p>
+            </div>
+          )}
         </div>
-      )}
+
+      </div>
+
     </div>
   );
 };

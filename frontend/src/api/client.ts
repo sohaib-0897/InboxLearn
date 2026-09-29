@@ -150,18 +150,13 @@ export interface DiffResponse {
 export interface MetricBlock {
   category_accuracy: number;
   category_macro_f1: number;
+  category_confusion_matrix?: number[][];
+  category_labels?: string[];
   priority_accuracy: number;
   priority_macro_f1: number;
-  confusion?: {
-    category: {
-      labels: string[];
-      matrix: number[][];
-    };
-    priority: {
-      labels: string[];
-      matrix: number[][];
-    };
-  };
+  priority_confusion_matrix?: number[][];
+  priority_labels?: string[];
+  rows?: any[];
 }
 
 export interface EvaluationResponse {
@@ -173,7 +168,7 @@ export interface EvaluationResponse {
   note: string;
   baseline: MetricBlock;
   updated: MetricBlock;
-  delta: {
+  delta?: {
     category_accuracy: number;
     category_macro_f1: number;
     priority_accuracy: number;
@@ -235,6 +230,26 @@ export const api = {
     fetchJson<{ status: string; imported: number; duplicates: number }>(`/inbox/demo-import?dataset=${encodeURIComponent(dataset)}`, {
       method: 'POST',
     }),
+
+  uploadEmailFile: async (file: File) => {
+    const form = new FormData();
+    form.append('file', file);
+    const res = await fetch(`${API_BASE}/inbox/upload`, { method: 'POST', body: form });
+    if (!res.ok) {
+      let errorDetail = `Request failed: ${res.statusText}`;
+      try {
+        const err = await res.json();
+        errorDetail = err.detail || err.message || errorDetail;
+      } catch {
+        // ignore non-JSON error bodies
+      }
+      throw new Error(errorDetail);
+    }
+    return res.json() as Promise<{
+      status: string;
+      result: { rows: number; new: number; duplicates: number; warnings?: number; format: string };
+    }>;
+  },
 
   saveFeedback: (emailId: number, category: string, priority: string) =>
     fetchJson<{ status: string; feedback_id: number; is_revision: boolean; email_id: number }>('/feedback', {

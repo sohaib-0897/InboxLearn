@@ -8,7 +8,7 @@ export default defineConfig({
     host: true,
     proxy: {
       '/api': {
-        target: 'http://127.0.0.1:8000',
+        target: 'http://127.0.0.1:8080',
         changeOrigin: true,
       },
     },
@@ -18,9 +18,9 @@ export default defineConfig({
     rollupOptions: {
       output: {
         manualChunks: {
-          'three-vendor': ['three'],
-          'animation-vendor': ['gsap', 'lenis', 'motion', '@react-spring/web', 'animejs'],
-          'react-vendor': ['react', 'react-dom'],
+          'vendor': ['react', 'react-dom', 'lucide-react', 'react-router-dom'],
+          'three': ['three'],
+          'react-three': ['@react-three/fiber'],
         },
       },
     },
