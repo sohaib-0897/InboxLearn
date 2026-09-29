@@ -162,3 +162,31 @@ When asked to continue:
 - From the repository root start the API with `python scripts/serve_api.py 8080`; from `frontend/` start Vite with `npm run dev`. Open `http://localhost:5173/` for the approved landing page or `http://localhost:5173/app` for the workspace. Vite proxies `/api` to `127.0.0.1:8080`.
 - The workspace depends on the local API for inbox/model data and continues to show its retry/unavailable states when the API is down. API-dependent content was available during this pass; only read-only browser interactions were checked here.
 - Existing user changes remain in the working tree. No reset, clean, stage, commit, or push was performed.
+
+## Streamlit workspace refresh (2026-09-30)
+
+### Changes
+
+- Refreshed the native Streamlit workspace so deployments that run `app.py` show the same warm paper, ink, and rust visual language as the React workspace.
+- Added a restrained editorial sidebar with InboxLearn branding, the learning-loop note, model/feedback status, routing threshold controls, and workspace information. Kept Streamlit's native tabs as the section navigator so its browser state and existing message-to-section callbacks remain reliable.
+- Restyled the native tabs, status metrics, headings, buttons, tables, fields, borders, and mobile layout. Streamlit's `auto` sidebar state opens the rail on desktop and starts collapsed on a fresh narrow viewport.
+- Kept the Streamlit landing route and all native InboxLearnService workflows intact. The deployed Streamlit app continues to use its local service and database; it does not depend on the React FastAPI client.
+
+### Files changed
+
+- `app.py` - auto sidebar behavior and workspace branding/routing rail.
+- `assets/newsprint.css` - warm editorial theme, rail, responsive styles, tab treatments, keyboard focus, and reduced-motion handling.
+- `.streamlit/config.toml` - matching offline-safe theme tokens and native widget colors.
+- `handoff.md` - this record.
+
+### Verification
+
+- `python -m pytest -q` - 157 passed with the existing Starlette `TestClient`/`httpx` deprecation warning.
+- `python -m py_compile app.py` - passed. Streamlit browser inspection used a disposable SQLite database under `%TEMP%`.
+- Inspected desktop Streamlit at 1440×1000 and fresh mobile at 390×844; no horizontal page overflow. The fresh mobile session starts with the rail collapsed and the workspace visible. Resizing to 768, 390, and 320 px also kept the document within the viewport.
+- Switched the native tab to Review queue and inspected its live rendered review desk. No browser page errors. The Streamlit root landing route still opens independently.
+- Temporary captures are under `%TEMP%/inboxlearn-streamlit-ui-pass/`; the repository reference image was not modified.
+
+### Deployment note
+
+- A Streamlit deployment connected to this repository will render the update after it pulls the new commit and restarts. The deployed Streamlit UI is still the native app, with its existing backend service and workflows; the React app remains separately available in the FastAPI/Vite setup.

@@ -25,7 +25,7 @@ from inboxlearn.presentation import (
     original_prediction, comparison, metric_rows, flash, show_flash, STATUS_LABELS,
 )
 
-st.set_page_config(page_title="InboxLearn", page_icon="✉", layout="wide", initial_sidebar_state="collapsed")
+st.set_page_config(page_title="InboxLearn", page_icon="✉", layout="wide", initial_sidebar_state="auto")
 
 APP_VERSION = "2.4.0"
 
@@ -776,14 +776,19 @@ def main() -> None:
     apply_newsprint()
     settings = Settings.from_environment()
     with st.sidebar:
+        st.html('''<div class="np-rail-brand"><span class="np-rail-mark">✉</span>
+          <span>InboxLearn</span></div><p class="np-rail-kicker">LOCAL EMAIL TRIAGE<br>HUMAN REVIEW · MODEL CONTROL</p>''')
         if st.button("Back to landing page", key="back_to_landing"):
             st.query_params["view"] = "landing"
             st.rerun()
-        st.header("Routing controls")
-        st.caption("Applies to future imports. Existing routing records stay as originally classified.")
-        category_threshold = st.slider("Category review threshold", 0.0, 1.0, min(1.0, max(0.0, settings.category_threshold)), 0.01)
-        priority_threshold = st.slider("Priority review threshold", 0.0, 1.0, min(1.0, max(0.0, settings.priority_threshold)), 0.01)
-        st.caption("Review when category OR priority falls below its threshold. Confidence is an uncalibrated estimate.")
+        st.html('''<div class="np-rail-note"><span class="np-rail-orbit"></span>
+          <p>Better inbox decisions,<br><strong>smarter models.</strong></p>
+          <small>A HUMAN-LED LEARNING LOOP</small></div>''')
+        with st.expander("Routing thresholds", expanded=False):
+            st.caption("Applies to future imports. Existing routing records stay as originally classified.")
+            category_threshold = st.slider("Category review threshold", 0.0, 1.0, min(1.0, max(0.0, settings.category_threshold)), 0.01)
+            priority_threshold = st.slider("Priority review threshold", 0.0, 1.0, min(1.0, max(0.0, settings.priority_threshold)), 0.01)
+            st.caption("Review when category OR priority falls below its threshold. Confidence is an uncalibrated estimate.")
     try:
         service = get_service(str(settings.db_path.resolve()), category_threshold, priority_threshold,
                               settings.max_upload_bytes, settings.max_rows, settings.random_state,
