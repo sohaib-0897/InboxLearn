@@ -190,3 +190,11 @@ When asked to continue:
 ### Deployment note
 
 - A Streamlit deployment connected to this repository will render the update after it pulls the new commit and restarts. The deployed Streamlit UI is still the native app, with its existing backend service and workflows; the React app remains separately available in the FastAPI/Vite setup.
+
+### Streamlit deployment startup follow-up
+
+- Removed the explicit `server.address = "127.0.0.1"` setting from `.streamlit/config.toml`. That loopback-only bind can prevent a hosted Streamlit proxy from reaching the app; leaving the address unset uses Streamlit's default server binding.
+- `python -c "from streamlit import config; print(config.get_option('server.address'))"` - confirmed the effective value is `None` (unset).
+- `python -m py_compile app.py` - passed.
+- Fresh Streamlit smoke launch on port 18501 with a disposable `%TEMP%` SQLite database - server reported `0.0.0.0:18501`; HTTP GET `/` returned 200. Server was stopped after the check.
+- The hosted deployment could not be inspected from this workspace. Confirm the Streamlit deployment is configured to run root `app.py` from branch `main`; if startup still fails after restart, capture its first traceback for diagnosis.
