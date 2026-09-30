@@ -229,7 +229,35 @@ def open_message(email_id: int, tab: str) -> None:
                                 next_review_email=email_id)
     else:
         st.session_state.update(inbox_search="", inbox_category="All categories", inbox_priority="All priorities",
-                                inbox_status="All statuses", inbox_batch="All batches", read_email=email_id)
+                                inbox_status_view="All messages", inbox_batch="All batches",
+                                read_email=email_id)
+
+
+def select_workspace_message(state_key: str, email_id: int) -> None:
+    """Select a message from a native Streamlit button in the queue."""
+    st.session_state[state_key] = int(email_id)
+
+
+def render_message_card(row: dict, *, state_key: str, selected_id: int, prefix: str) -> None:
+    """Render a keyboard-accessible, service-backed message choice."""
+    selected = int(row["id"]) == int(selected_id)
+    status = STATUS_LABELS.get(row.get("status"), str(row.get("status", ""))).upper()
+    card_key = f"{prefix}_message_{row['id']}_{'selected' if selected else 'card'}"
+    with st.container(key=card_key):
+        st.button(row["subject"] or "(No subject)", key=f"{prefix}_select_{row['id']}",
+                  on_click=select_workspace_message, args=(state_key, int(row["id"])),
+                  type="primary" if selected else "secondary", use_container_width=True)
+        st.caption(f"{row.get('sender') or 'Sender not supplied'}  ·  {status}")
+        st.caption(f"{row['effective_category']} / {row['effective_priority']}  ·  "
+                   f"{(_row_val(row, 'source_type') or 'csv').upper()}  ·  "
+                   f"{_row_val(row, 'date_header') or 'Date not supplied'}")
+        cat, pri = st.columns(2)
+        with cat:
+            st.caption(f"Category · {float(row['category_confidence']):.0%}")
+            st.progress(min(1.0, max(0.0, float(row["category_confidence"]))))
+        with pri:
+            st.caption(f"Priority · {float(row['priority_confidence']):.0%}")
+            st.progress(min(1.0, max(0.0, float(row["priority_confidence"]))))
 
 
 def action_controls(service, act, key):
@@ -403,13 +431,14 @@ def render_upload(service: InboxLearnService) -> None:
     batches = service.import_batches()
     batch_options = ["All batches"] + [b["import_batch"] for b in batches] if batches else []
     with st.container(key="inbox_filters"):
-        query_col, category_col, status_col = st.columns([2, 1, 1])
+        st.radio("Message status", ["All messages", "Needs review", "Auto-classified", "Feedback saved"],
+                 horizontal=True, key="inbox_status_view")
+        query_col, category_col = st.columns([2, 1])
         with query_col:
             query = st.text_input("Search subject, sender or body", key="inbox_search").casefold()
         with category_col:
             category = st.selectbox("Category", ["All categories", *CATEGORIES], key="inbox_category")
-        with status_col:
-            status = st.selectbox("Review status", ["All statuses", *STATUS_LABELS.values()], key="inbox_status")
+    status = st.session_state["inbox_status_view"]
     priority_filter = st.selectbox("Priority", ["All priorities", *PRIORITIES], key="inbox_priority")
     if batch_options:
         batch_filter = st.selectbox("Import batch", batch_options, key="inbox_batch")
@@ -418,13 +447,32 @@ def render_upload(service: InboxLearnService) -> None:
     filtered = [r for r in rows if (not query or query in " ".join([r['subject'], r['body'], r['sender']]).casefold())
                 and (category == "All categories" or r["effective_category"] == category)
                 and (priority_filter == "All priorities" or r["effective_priority"] == priority_filter)
-                and (status == "All statuses" or STATUS_LABELS[r["status"]] == status)
+                and (status == "All messages" or STATUS_LABELS[r["status"]] == status)
                 and (batch_filter == "All batches" or r.get("import_batch", "") == batch_filter)]
     listing, detail = st.columns([7, 4], gap="large")
     with listing:
-        st.caption(f"{len(filtered)} of {len(rows)} messages · original predictions")
+        st.markdown("#### Message queue")
+        st.caption(f"{len(filtered)} of {len(rows)} messages · select a message to read it")
+        visible_ids = {int(r["id"]) for r in filtered}
+        selected_id = st.session_state.get("read_email")
+        if selected_id not in visible_ids:
+            selected_id = int(filtered[0]["id"]) if filtered else None
+            if selected_id is not None:
+                st.session_state["read_email"] = selected_id
         if filtered:
-            st.dataframe(pd.DataFrame([{
+            labels = {int(r["id"]): message_label(r) for r in filtered}
+            selected_id = int(st.selectbox("Jump to message", list(labels), format_func=labels.get,
+                                           key="read_email"))
+            with st.container(key="inbox_message_list"):
+                for item in filtered:
+                    render_message_card(item, state_key="read_email",
+                                        selected_id=selected_id, prefix="inbox")
+        else:
+            st.info("No messages match these filters. Clear search or choose All messages / All categories.")
+        # Keep the complete sortable data view available for users who need a tabular scan/export.
+        with st.expander("Open full inbox table", expanded=False):
+            if filtered:
+                st.dataframe(pd.DataFrame([{
                 "ID": r["id"],
                 "Date": _row_val(r, "date_header") or "—",
                 "Source": (_row_val(r, "source_type") or "csv").upper(),
@@ -435,10 +483,10 @@ def render_upload(service: InboxLearnService) -> None:
                 "Category estimate": r["category_confidence"],
                 "Priority estimate": r["priority_confidence"],
                 "Status": STATUS_LABELS.get(_row_val(r, "status"), str(_row_val(r, "status"))),
-            } for r in filtered]), hide_index=True, width="stretch", height=360,
-                column_config={name: st.column_config.NumberColumn(format="percent") for name in ["Category estimate", "Priority estimate"]}, key="inbox_table")
-        else:
-            st.info("No messages match these filters. Clear search or choose All categories / All statuses.")
+                } for r in filtered]), hide_index=True, width="stretch", height=360,
+                    column_config={name: st.column_config.NumberColumn(format="percent") for name in ["Category estimate", "Priority estimate"]}, key="inbox_table")
+            else:
+                st.caption("The table is empty for the current filters.")
         st.download_button("Export full inbox CSV", service.export_csv(), "inboxlearn-export.csv", "text/csv", key="inbox_export")
         st.caption("Export includes all messages and latest corrections, with spreadsheet-formula protection.")
     with detail, st.container(key="inbox_detail"):
@@ -446,10 +494,8 @@ def render_upload(service: InboxLearnService) -> None:
         if not filtered:
             st.caption("Select a matching message to read it here.")
         else:
-            labels = {r["id"]: message_label(r) for r in filtered}
-            selected_id = st.selectbox("Read message ID", list(labels), format_func=labels.get, key="read_email")
             row = next(r for r in filtered if r["id"] == selected_id)
-            show_email(row)
+            show_email(row, "inbox")
             st.caption(f"{row['label_source']}: {row['effective_category']} / {row['effective_priority']}")
             st.button("Review this message", key="review_from_inbox", on_click=open_message, args=(row["id"], "Review queue"))
             original_prediction(row)
@@ -530,17 +576,29 @@ def render_review(service: InboxLearnService) -> None:
             if not confirming or st.button("Refresh preview", key="refresh_batch"):
                 st.session_state["batch_preview"] = {"snapshot": snapshot, "token": str(uuid.uuid4())}
 
-    labels = {r["id"]: message_label(r) for r in rows}
     next_id = st.session_state.pop("next_review_email", None)
-    if next_id in labels:
+    row_ids = {int(r["id"]) for r in rows}
+    if next_id in row_ids:
         st.session_state["review_email"] = next_id
-    elif st.session_state.get("review_email") not in labels:
-        st.session_state["review_email"] = rows[0]["id"]
-    selected = st.selectbox("Message to review", list(labels), format_func=labels.get, key="review_email")
-    row = next(r for r in rows if r["id"] == selected)
-    reading, editing = st.columns([3, 2], gap="large")
-    with reading:
-        show_email(row)
+    elif st.session_state.get("review_email") not in row_ids:
+        st.session_state["review_email"] = int(rows[0]["id"])
+    selected = int(st.session_state["review_email"])
+    row = next(r for r in rows if int(r["id"]) == selected)
+    queue, detail = st.columns([2, 3], gap="large")
+    with queue:
+        st.markdown("#### Review queue")
+        st.caption(f"{len(rows)} message(s) · ordered by {order.lower()}")
+        labels = {int(r["id"]): message_label(r) for r in rows}
+        selected = int(st.selectbox("Jump to message", list(labels), format_func=labels.get,
+                                    key="review_email"))
+        row = next(r for r in rows if int(r["id"]) == selected)
+        with st.container(key="review_message_list"):
+            for item in rows:
+                render_message_card(item, state_key="review_email", selected_id=selected,
+                                    prefix="review")
+    with detail:
+        st.markdown("#### Reading pane")
+        show_email(row, "review")
         st.caption(f"{row['label_source']}: {row['effective_category']} / {row['effective_priority']}")
         original_prediction(row)
         st.markdown("**ROUTING RECORD**")
@@ -557,33 +615,33 @@ def render_review(service: InboxLearnService) -> None:
         entities = service.entities_for_email(int(row["id"]))
         render_calendar_editor(row, entities, f"review_{row['id']}", service=service)
         render_action_journal(service, row, f"review_act_{row['id']}")
-    with editing, st.container(key="correction_panel"):
-        st.subheader("Human confirmation")
-        history = [dict(h) for h in service.repo.feedback_for_email(int(row["id"]))]
-        current = history[-1] if history else row
-        if history:
-            st.caption(f"Latest correction #{current['id']} · {current['category']} / {current['priority']}")
-        with st.form(f"feedback-{row['id']}"):
-            category = st.selectbox("Confirmed category", CATEGORIES, index=CATEGORIES.index(current["category"]), key=f"category-{row['id']}")
-            priority = st.selectbox("Confirmed priority", PRIORITIES, index=PRIORITIES.index(current["priority"]), key=f"priority-{row['id']}")
-            st.caption("Saving records human feedback only. Prepare a candidate separately in Train / Versions.")
-            save = st.form_submit_button("Save human correction")
-            save_next = st.form_submit_button("Save and next", type="primary")
-            if save or save_next:
-                try:
-                    correction_id, created = service.save_feedback(int(row["id"]), category, priority)
-                    if save_next:
-                        unresolved = [r for r in _safe_review_rows(service, **queue_options, unresolved=True)]
-                        if unresolved:
-                            st.session_state["next_review_email"] = unresolved[0]["id"]
-                        else:
-                            st.session_state["review_complete"] = True
-                    flash(f"Correction #{correction_id} {'saved' if created else 'already recorded'}. Model unchanged; prepare a candidate when ready.")
-                except Exception as exc:
-                    st.error(f"Could not save feedback: {exc}")
-        if history:
-            with st.expander("Correction history"):
-                st.dataframe([{"Correction": h["id"], "Category": h["category"], "Priority": h["priority"], "Replaces": h["replaces_feedback_id"]} for h in history], hide_index=True, width="stretch")
+        with st.container(key="correction_panel"):
+            st.subheader("Human confirmation")
+            history = [dict(h) for h in service.repo.feedback_for_email(int(row["id"]))]
+            current = history[-1] if history else row
+            if history:
+                st.caption(f"Latest correction #{current['id']} · {current['category']} / {current['priority']}")
+            with st.form(f"feedback-{row['id']}"):
+                category = st.selectbox("Confirmed category", CATEGORIES, index=CATEGORIES.index(current["category"]), key=f"category-{row['id']}")
+                priority = st.selectbox("Confirmed priority", PRIORITIES, index=PRIORITIES.index(current["priority"]), key=f"priority-{row['id']}")
+                st.caption("Saving records human feedback only. Prepare a candidate separately in Train / Versions.")
+                save = st.form_submit_button("Save human correction")
+                save_next = st.form_submit_button("Save and next", type="primary")
+                if save or save_next:
+                    try:
+                        correction_id, created = service.save_feedback(int(row["id"]), category, priority)
+                        if save_next:
+                            unresolved = [r for r in _safe_review_rows(service, **queue_options, unresolved=True)]
+                            if unresolved:
+                                st.session_state["next_review_email"] = unresolved[0]["id"]
+                            else:
+                                st.session_state["review_complete"] = True
+                        flash(f"Correction #{correction_id} {'saved' if created else 'already recorded'}. Model unchanged; prepare a candidate when ready.")
+                    except Exception as exc:
+                        st.error(f"Could not save feedback: {exc}")
+            if history:
+                with st.expander("Correction history"):
+                    st.dataframe([{"Correction": h["id"], "Category": h["category"], "Priority": h["priority"], "Replaces": h["replaces_feedback_id"]} for h in history], hide_index=True, width="stretch")
 
 
 def render_versions(service: InboxLearnService) -> None:

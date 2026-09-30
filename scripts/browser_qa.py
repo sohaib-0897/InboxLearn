@@ -22,7 +22,7 @@ from playwright.sync_api import sync_playwright, expect, TimeoutError as Playwri
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 from inboxlearn.demo import load_demo_rows
-OUT = ROOT / "runtime" / "newsprint-qa"
+OUT = Path(os.environ.get("INBOXLEARN_BROWSER_QA_OUT", ROOT / "runtime" / "newsprint-qa"))
 OUT.mkdir(parents=True, exist_ok=True)
 
 
@@ -37,7 +37,13 @@ def no_overflow(page):
 def settled(page):
     # Allow tab-triggered reruns to arrive before checking that rendering finished.
     page.wait_for_timeout(300)
-    expect(page.get_by_test_id("stStatusWidget")).to_have_count(0, timeout=90000)
+    try:
+        expect(page.get_by_test_id("stStatusWidget")).to_have_count(0, timeout=90000)
+    except AssertionError:
+        print("Streamlit status:", page.get_by_test_id("stStatusWidget").all_text_contents())
+        print("Streamlit exceptions:", page.get_by_test_id("stException").all_text_contents())
+        page.screenshot(path=str(OUT / "debug-stalled.png"), full_page=True)
+        raise
     expect(page.get_by_role("button", name="Stop", exact=True)).to_have_count(0, timeout=90000)
     expect(page.get_by_role("tab")).to_have_count(5, timeout=90000)
 
@@ -129,12 +135,21 @@ def run_browser(url, profile):
         page.keyboard.press("Space")
         expect(checkbox).to_be_checked()
         settled(page)
+        first_review_button = page.get_by_role(
+            "button", name=load_demo_rows("demo_feedback.csv")[0]["subject"], exact=True)
+        first_review_button.focus()
+        review_button_focus = page.evaluate("""() => ({tag: document.activeElement.tagName,
+            outline: getComputedStyle(document.activeElement).outlineStyle,
+            width: getComputedStyle(document.activeElement).outlineWidth})""")
+        assert review_button_focus["tag"] == "BUTTON" and review_button_focus["outline"] != "none" and review_button_focus["width"] != "0px", review_button_focus
+        page.keyboard.press("Enter")
+        settled(page)
         # Replay the same pre-authored human-label fixtures as experiment.py.
         # This exercises correction controls; it never copies model predictions.
         for i, example in enumerate(load_demo_rows("demo_feedback.csv"), start=1):
-            review_selector = page.locator(".st-key-review_email").get_by_role("combobox")
-            choose(page, review_selector,
-                   f"#{i} · {example['subject']}")
+            # Exercise the redesigned keyboard-accessible queue button. The
+            # message selector remains available as a jump control and fallback.
+            page.get_by_role("button", name=example["subject"], exact=True).click()
             settled(page)
             for target in ("category", "priority"):
                 # Wait for this email's keyed widget, not a stale form from the prior rerun.
@@ -225,6 +240,11 @@ def run_browser(url, profile):
             page.get_by_role("tab", name=tab, exact=True).click()
             settled(page)
             overflow_checks.append(no_overflow(page))
+        responsive_checks = []
+        for size in ((768, 1024), (320, 800)):
+            page.set_viewport_size({"width": size[0], "height": size[1]})
+            settled(page)
+            responsive_checks.append(no_overflow(page))
         page.get_by_role("tab", name="Review queue", exact=True).click()
         page.locator('div[class*="st-key-category-"]').get_by_role("combobox").click()
         expect(page.get_by_role("option", name="bills", exact=True)).to_be_visible()
@@ -243,9 +263,11 @@ def run_browser(url, profile):
         assert not errors, errors
         assert not external, external
         evidence = {"browser": browser.version, "viewport": viewport, "focus": focus,
-                          "overflow": overflow_checks, "page_errors": errors, "external_requests": external,
+                          "review_button_focus": review_button_focus,
+                          "overflow": overflow_checks, "responsive_overflow": responsive_checks,
+                          "page_errors": errors, "external_requests": external,
                           "workflow": "upload/classify/save and next/schedule/open email/review confirmed/done/reopen/cancel/prepare/deduplicate/preview/evaluate/activate/rollback/reactivate passed",
-                          "data": "Only the shipped synthetic demonstration fixtures", "screenshots": "runtime/newsprint-qa"}
+                          "data": "Only the shipped synthetic demonstration fixtures", "screenshots": str(OUT)}
         print(json.dumps(evidence, indent=2))
         browser.close()
         return evidence

@@ -71,6 +71,50 @@ header[data-testid="stHeader"] { background: transparent; }
 [data-testid="stWidgetLabel"] p { font-weight: 600; }
 .st-key-inbox_filters { border-top: var(--np-rule); padding-top: 16px; }
 .st-key-inbox_detail, .st-key-correction_panel, .st-key-version_ledger { border-left: 1px solid #D4CABB; padding-left: 24px; }
+.st-key-inbox_message_list, .st-key-review_message_list {
+  max-height: min(76vh, 840px); overflow-y: auto; overscroll-behavior: contain;
+  padding: 4px 12px 4px 2px; scrollbar-color: #B8A996 #EEE7DC;
+}
+.st-key-inbox_message_list [class*="st-key-inbox_message_"][class*="_card"],
+.st-key-inbox_message_list [class*="st-key-inbox_message_"][class*="_selected"],
+.st-key-review_message_list [class*="st-key-review_message_"][class*="_card"],
+.st-key-review_message_list [class*="st-key-review_message_"][class*="_selected"] {
+  margin: 0 0 10px; padding: 10px 12px; border: 1px solid #D4CABB;
+  border-left: 3px solid transparent; border-radius: 3px; background: #FFFDF8;
+}
+.st-key-inbox_message_list [class*="st-key-inbox_message_"][class*="_selected"],
+.st-key-review_message_list [class*="st-key-review_message_"][class*="_selected"] {
+  border-color: #C98B71; border-left-color: var(--np-accent); background: #F8EEE6;
+}
+.st-key-inbox_message_list [class*="st-key-inbox_message_"] [data-testid="stButton"] button,
+.st-key-review_message_list [class*="st-key-review_message_"] [data-testid="stButton"] button {
+  min-height: 44px; justify-content: flex-start; text-align: left;
+  font: 600 16px/1.3 var(--np-display); overflow-wrap: anywhere;
+}
+.st-key-inbox_message_list [class*="st-key-inbox_message_"] [data-testid="stButton"] button > div,
+.st-key-review_message_list [class*="st-key-review_message_"] [data-testid="stButton"] button > div { width: 100%; justify-content: flex-start; }
+.st-key-inbox_message_list [class*="st-key-inbox_message_"] [data-testid="stButton"] button p,
+.st-key-review_message_list [class*="st-key-review_message_"] [data-testid="stButton"] button p { width: 100%; text-align: left; }
+.st-key-inbox_message_list [class*="st-key-inbox_message_"][class*="_selected"] [data-testid="stButton"] button[kind="primary"],
+.st-key-review_message_list [class*="st-key-review_message_"][class*="_selected"] [data-testid="stButton"] button[kind="primary"] {
+  color: #80371F; background: transparent; border-color: transparent; box-shadow: none;
+}
+.st-key-inbox_message_list [class*="st-key-inbox_message_"] [data-testid="stProgress"],
+.st-key-review_message_list [class*="st-key-review_message_"] [data-testid="stProgress"] { padding-top: 0; }
+.st-key-inbox_filters [data-testid="stRadio"] [role="radiogroup"] { gap: 8px; flex-wrap: wrap; }
+.st-key-inbox_filters [data-testid="stRadio"] label {
+  min-height: 38px; padding: 5px 10px; border: 1px solid #D4CABB; border-radius: 2px;
+  background: #FFFDF8; color: #4C4035;
+}
+.stMain [class*="st-key-email_reading_"] { margin: 10px 0 16px; padding: 16px; border: 1px solid #D4CABB; background: #FFFDF8; }
+.stMain [class*="st-key-email_reading_"] [data-testid="stCaptionContainer"] p { color: #74695C; font: 600 10px/1.5 var(--np-mono); letter-spacing: .07em; }
+.stMain [class*="st-key-email_reading_"] [data-testid="stText"] { max-width: 100%; margin: 3px 0; overflow-wrap: anywhere; }
+.stMain [class*="st-key-email_body_"] { max-height: 400px; overflow: auto; margin-top: 10px; padding: 12px; border: 1px solid #E2D9CC; background: #F7F3EC; }
+.stMain [class*="st-key-email_body_"] [data-testid="stText"] { color: #34302B; font: 15px/1.7 var(--np-reading); white-space: pre-wrap; user-select: text; }
+.np-original-prediction { margin: 10px 0 16px; padding: 14px; border: 1px solid #D4CABB; background: #F5F0E8; }
+.np-prediction-labels { margin: 0; color: var(--np-ink); font: 600 17px/1.45 var(--np-display); }
+.np-prediction-confidence { margin: 5px 0 0; color: #625B52; font: 12px/1.5 var(--np-controls); }
+.st-key-correction_panel { margin-top: 16px; border: 1px solid #C98B71; border-left: 3px solid var(--np-accent); padding: 16px; background: #F8EEE6; }
 [data-testid="stButton"] button, [data-testid="stDownloadButton"] button,
 [data-testid="stFormSubmitButton"] button { min-height: 42px; border: 1px solid #CFC4B4; border-radius: var(--np-radius); box-shadow: none; color: #3B342D; }
 button[kind="primary"], button[kind="primaryFormSubmit"] { background: var(--np-accent); color: #FFFDF8; border-color: var(--np-accent); }
@@ -109,6 +153,9 @@ button[kind="secondary"]:hover:not(:disabled), button[kind="secondaryFormSubmit"
   .st-key-status_strip [data-testid="stHorizontalBlock"] { display: grid; grid-template-columns: 1fr 1fr; }
   .st-key-status_strip { padding: 16px; }
   .st-key-inbox_detail, .st-key-correction_panel, .st-key-version_ledger { border-left: 0; border-top: var(--np-rule); padding: 16px 0 0; }
+  .st-key-correction_panel { border: 1px solid #C98B71; border-left: 3px solid var(--np-accent); padding: 14px; }
+  .st-key-inbox_message_list, .st-key-review_message_list { max-height: 56vh; padding-right: 4px; }
+  .stMain [class*="st-key-email_reading_"] { padding: 14px; }
   [data-testid="stTabs"] [role="tablist"] { gap: 16px; }
 }
 @media (prefers-reduced-motion: reduce) {

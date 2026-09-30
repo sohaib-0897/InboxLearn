@@ -1,5 +1,6 @@
 """Small Newsprint presentation helpers. No persistence or learning logic."""
 from html import escape
+from contextlib import nullcontext
 from pathlib import Path
 
 import pandas as pd
@@ -48,7 +49,7 @@ def _field(row, key, default=""):
         return default
 
 
-def show_email(row: dict) -> None:
+def show_email(row: dict, key_prefix: str = "email") -> None:
     status_label = STATUS_LABELS.get(_field(row, "status"), str(_field(row, "status"))).upper()
     source_type = (_field(row, "source_type") or "csv").upper()
     date_header = _field(row, "date_header")
@@ -79,16 +80,28 @@ def show_email(row: dict) -> None:
         except Exception:
             pass
 
-    # Never interpret email subjects, senders or bodies as Markdown/HTML.
-    st.text("Subject: " + row["subject"])
-    st.text("From: " + (row["sender"] or "Not supplied"))
-    st.text(row["body"])
+    # Email content is untrusted. Streamlit's text widget keeps it inert as plain text.
+    container = (st.container(key=f"email_reading_{key_prefix}_{row['id']}")
+                 if hasattr(st, "container") else nullcontext())
+    with container:
+        st.caption("EMAIL CONTENT")
+        st.text("Subject: " + str(row["subject"]))
+        st.text("From: " + (row["sender"] or "Not supplied"))
+        if date_header:
+            st.caption(f"Date: {date_header}")
+        body_container = (st.container(key=f"email_body_{key_prefix}_{row['id']}")
+                          if hasattr(st, "container") else nullcontext())
+        with body_container:
+            st.caption("MESSAGE")
+            st.text(row["body"])
 
 
 def original_prediction(row: dict) -> None:
-    st.caption(f"ORIGINAL PREDICTION / MODEL v{row['model_version_id']}")
-    st.write(f"**{row['category']}** / {row['priority']} priority")
-    st.caption(f"Category {row['category_confidence']:.1%} · Priority {row['priority_confidence']:.1%} · Uncalibrated estimates")
+    st.html(f'''<section class="np-original-prediction" aria-label="Original model prediction">
+      <p class="np-email-eyebrow">ORIGINAL MODEL SUGGESTION / VERSION {escape(str(row['model_version_id']))}</p>
+      <p class="np-prediction-labels"><strong>{escape(str(row['category']))}</strong> / {escape(str(row['priority']))} priority</p>
+      <p class="np-prediction-confidence">Category {float(row['category_confidence']):.1%} · Priority {float(row['priority_confidence']):.1%} · Uncalibrated estimates</p>
+    </section>''')
 
 
 def metric_rows(result: dict) -> list[dict]:

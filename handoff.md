@@ -211,3 +211,24 @@ When asked to continue:
 - Replaced obsolete agency-screenshot paths and claims in `README.md` with the current Streamlit landing, inbox, review, evaluation, and mobile captures; clarified the difference between Streamlit's `?view=workspace` and the React app's `/app` route.
 - Updated the README's actual workflow labels and the latest recorded test count. Added current screenshots to `PORTFOLIO.md` and clarified screenshot provenance in `docs/screenshots/README.md`.
 - Corrected `docs/PROJECT_GUIDE.md` to describe the current local font stack, default Streamlit server binding, current route, screenshot gallery, and latest recorded test result.
+
+## Streamlit workspace redesign implementation (2026-10-01)
+
+### Implementation
+
+- Kept root `app.py` as the deployed Streamlit entry point, with `/` still rendering the landing page and `?view=workspace` opening the native workspace. The Streamlit app continues to call `InboxLearnService` directly; no React, FastAPI, or new dependency was introduced.
+- Added a message status filter group and a scrollable inbox/review queue of selectable native Streamlit buttons. Each message shows sender, status, effective labels, source/date metadata, and paired category/priority confidence bars; the selected row has a clear rust accent. The existing message jump selectors remain available.
+- Added an email reading surface with inert plain-text subject, sender, date, and body, followed by the original model suggestion and a visibly separate human-confirmation panel. Retained the sortable inbox table in an expander and kept export, filters, batch confirmation, correction history, entities, action journal, training, evaluation, activation, and rollback wired to their existing service calls.
+- Extended `assets/newsprint.css` for the message cards, confidence cues, reading surface, status filters, correction panel, responsive stacking, and keyboard focus. Updated `scripts/browser_qa.py` to drive the queue buttons, check keyboard focus/Enter selection, and measure horizontal overflow at 768 px and 320 px; QA captures can be directed to a temp directory.
+
+### Verification
+
+- `python -m pytest -q` - 157 passed. One existing Starlette `TestClient` / `httpx` deprecation warning remains.
+- `python -m py_compile app.py inboxlearn/presentation.py scripts/browser_qa.py` - passed.
+- `python scripts/browser_qa.py` - passed in Chromium at 1440 x 1000 and 390 x 844. No horizontal overflow at either size or when resized to 768 x 1024 and 320 x 800; no page errors or external requests. Visible keyboard focus and Enter selection on a review message passed.
+- Browser workflow passed for the root landing and `?view=workspace`, import/classification, corrections, follow-up staging and lifecycle, candidate preparation, prediction preview, evaluation, activation, rollback, and reactivation. The browser used only the shipped synthetic fixtures and a disposable SQLite database.
+- Visually inspected desktop and mobile inbox/review captures written under `%TEMP%/inboxlearn-workspace-redesign-qa/`.
+
+### Deployment note
+
+- These changes are in root `app.py`, which matches the configured Streamlit Community Cloud entry point. The hosted deployment was not restarted from this workspace. The redesign was committed and pushed to the configured `main` source branch; verify the Community Cloud deployment status and app after it reloads.
