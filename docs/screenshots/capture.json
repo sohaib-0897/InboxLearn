@@ -10,6 +10,11 @@
       "outline": "solid",
       "width": "3px"
     },
+    "review_button_focus": {
+      "tag": "BUTTON",
+      "outline": "solid",
+      "width": "3px"
+    },
     "overflow": [
       {
         "viewport": 1440,
@@ -30,6 +35,18 @@
         "viewport": 1440,
         "body": 1440,
         "main": 1140
+      }
+    ],
+    "responsive_overflow": [
+      {
+        "viewport": 768,
+        "body": 768,
+        "main": 767
+      },
+      {
+        "viewport": 320,
+        "body": 320,
+        "main": 320
       }
     ],
     "page_errors": [],
@@ -63,6 +80,11 @@
       "outline": "solid",
       "width": "3px"
     },
+    "review_button_focus": {
+      "tag": "BUTTON",
+      "outline": "solid",
+      "width": "3px"
+    },
     "overflow": [
       {
         "viewport": 390,
@@ -85,6 +107,18 @@
         "main": 390
       }
     ],
+    "responsive_overflow": [
+      {
+        "viewport": 768,
+        "body": 768,
+        "main": 767
+      },
+      {
+        "viewport": 320,
+        "body": 320,
+        "main": 320
+      }
+    ],
     "page_errors": [],
     "external_requests": [],
     "workflow": "upload/classify/save and next/schedule/open email/review confirmed/done/reopen/cancel/prepare/deduplicate/preview/evaluate/activate/rollback/reactivate passed",
@@ -105,38 +139,38 @@
     "scores_match_learning_report": true,
     "preview_matches_learning_report": true
   },
-  "captured_at": "2026-09-30T10:12:36.985836+00:00",
+  "captured_at": "2026-09-30T22:31:37.042425+00:00",
   "source_sha256": {
-    "app.py": "fe61de2a2a92969e6b2574c6c2ddcaca406debcbc39fb2ec8daf1a3fbce562cc",
-    "inboxlearn/presentation.py": "100849e5dc3c4715a436125b8a7cda45b0ab17eb4d7f1b0db79eb26665fc73bf",
+    "app.py": "d07358961834511e4b7939e7f65f1722f0893775b18680a77922803b581d2958",
+    "inboxlearn/presentation.py": "bdee7a1c2f85f8d1ae3a1a710030c87439ff42a52063bef167325b87b46e3197",
     "inboxlearn/landing.py": "470500e02bb1a42b9bc061cf39e78c0372e1ca565ee6e9033f09d4a85abd6d66",
-    "assets/newsprint.css": "8bf8412444c481e930e0d8ac30e3fc444dce7cde2dab578e3b9efd6f5e013803",
+    "assets/newsprint.css": "d401af7fefe3fac24de85bb5c59a2ca8574b13f987ea4a01ce9eb5658e377b10",
     "landing/index.html": "959e1f0b43b01239c3c0b0d65294a7ca24b2059ac45bbf69d4144cb87c153ca5",
     "landing/styles.css": "01a83cf6903629a0f9675e407275909fa8ab81f8ac92586e1f33778b225508d8",
     "landing/script.js": "1fa6aec1dfaa995827468a7ff1a4d0f7ff05c39d5896b6bdc3cb49d1ebb09e78",
     ".streamlit/config.toml": "df839eb063b49c7d50d143b0be838269e6c02510548635da8a33ec7d1b3d1b44",
-    "scripts/browser_qa.py": "8a194476c286351d3aa6f63209d9f19d8f08d2f2776986bc2be2f89760a0b99b"
+    "scripts/browser_qa.py": "8c822388160b244e68e4ada30e80baad043670f9ac9935f6948dff124d5c621c"
   },
   "screenshot_sha256": {
     "desktop-landing.png": "b37616702b75e86067c32071d8862cac769619a7b8b567f6628f1961dbc62dc3",
     "desktop-today-empty.png": "74c1258f4276e0076cd2f034e7fcb88d772686228f8bc7f8c8eb101745364d24",
     "desktop-today.png": "7dfccfb29f1f43a1e36246de61b94b25ba7dd2c455190bd33b8135981baff4f7",
-    "desktop-inbox.png": "6fd2542524839b594bcd2b1e02660875e15aa5d8cd4d5e6d670332ff457b6472",
-    "desktop-review.png": "1bb22d1bac562dc91acd555866ffd0511cf20a44b1da9ae296f05efc3770d3db",
-    "desktop-candidate.png": "abcc96149ab1e2557c93ca36837edf997a85c7a864f5b8a7c5dd398a790135cd",
+    "desktop-inbox.png": "5c4afdab02eec552a6e10b4758234e9e5f0097abd732945976802d3f74ab0b50",
+    "desktop-review.png": "435f929de19d5d3799a7c78520b3df389c9683f5a02376fd69f70f915f9e301d",
+    "desktop-candidate.png": "7e8e22871d0bf6b71ab0b73435801b2951d76a2968f79de6006d81a90cc2ddda",
     "desktop-prediction-changes.png": "3b3a29d1437244ecb45dc8ecce91feea101526d063238c547b781de71f9bac51",
-    "desktop-evaluation.png": "d6d733c22db8c9251a02ca546c6ea33339fa17d889558133be4a1c62b5be1420",
-    "desktop-matrices.png": "342d371235186b422333f7a3d9118ce52c3cdbb092e048f8550fa178115a94c0",
-    "desktop-versions.png": "6d977aa0b829d28f287b799cece15366cb78f86cfe6baa34f519e9df08f6801f",
+    "desktop-evaluation.png": "f8eb941a16e2ebc0a95cf54ec8677b776b4f95144f71fd0c255ed063b7078c31",
+    "desktop-matrices.png": "72ce96516ee3f78d7c47720f02cff132749c37cdb579aeaa5007d934f2fbc13f",
+    "desktop-versions.png": "22d1f81aefab9d7dbffdf3513933d501e3e1ebffc735bb9bca252f8badd81908",
     "mobile-landing.png": "411cf8e7e8610337127fa74ace69e31a7f92d2caf10a53ee93817c7106c9019e",
-    "mobile-today-empty.png": "015802fbd3293108ec216d4164f1e0a9b4f362a3a8f3c1ae9951a83e11ef472f",
-    "mobile-today.png": "871ad3b29fc491d4493bcbf42d87816fa80d2895fcb8671aaad11602dca94295",
-    "mobile-inbox.png": "ed0abd06b5bc57813ea1535dde3ed2c29a6f03a59f1e7c8c1644089d7c694480",
-    "mobile-review.png": "876bfb6c4f70c7731ceeb473b2631dbaa9c35963dd927cc9a57980104513b863",
-    "mobile-candidate.png": "3c8e1f16c06ccd9859a0d93777086afaf267fd2f40497dd3affc2d051fec025a",
+    "mobile-today-empty.png": "9587648462a3339c1783fdd209ba0239fd441ebbf4d96c738f1c653c83eff4c0",
+    "mobile-today.png": "2c900c8ce9dc4d5f6d65e3a7f16a8579de461dd1c217cb903260cb0245626863",
+    "mobile-inbox.png": "1c76e899117d966c5d66c4256868454af59c20edb28f30480162b0b463d47be9",
+    "mobile-review.png": "813e517054634240b52d4f6532576d54373f0e98c67113cd060db5aff955d9aa",
+    "mobile-candidate.png": "aab08b6d2f0d8e43300d16c5f4fde8e021cecbbe225ec1c4aa1000a1a871bb79",
     "mobile-prediction-changes.png": "d5ff01a7d077181c20be9718ef9b246dfc0dbb109fc2d953312be5b527c09ab0",
-    "mobile-evaluation.png": "183992877fb9dede621f4d99d4f60908264ac85d4647e3ca6e176a97520f41ad",
-    "mobile-matrices.png": "36dad05bf5b07f769083d23ad24bf81a476e956ab1df3e53951b50f64479a9b9",
-    "mobile-versions.png": "9923cb44e9c2ed1f67d827b1044a00605f06bbcf1057bd7cb5d86cc04c05f83c"
+    "mobile-evaluation.png": "508101ce079a090e6366bbc3dc7d0d8975a033e26a8c3708ccef444ed99efbc4",
+    "mobile-matrices.png": "01cb8a5b2e6d2e18e5cbb20d0ac0d606223d18179be1e631231448ce50eec41a",
+    "mobile-versions.png": "91405136d3b69f59fb01d2de9453f7ff7a50d49b65e2eaba805f58061455a2b8"
   }
 }
