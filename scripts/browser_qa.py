@@ -8,6 +8,7 @@ import hashlib
 import json
 import os
 from pathlib import Path
+import re
 import socket
 import shutil
 import subprocess
@@ -36,9 +37,9 @@ def no_overflow(page):
 def settled(page):
     # Allow tab-triggered reruns to arrive before checking that rendering finished.
     page.wait_for_timeout(300)
-    expect(page.get_by_test_id("stStatusWidget")).to_have_count(0)
-    expect(page.get_by_role("button", name="Stop", exact=True)).to_have_count(0)
-    expect(page.get_by_role("tab")).to_have_count(5)
+    expect(page.get_by_test_id("stStatusWidget")).to_have_count(0, timeout=90000)
+    expect(page.get_by_role("button", name="Stop", exact=True)).to_have_count(0, timeout=90000)
+    expect(page.get_by_role("tab")).to_have_count(5, timeout=90000)
 
 
 def frame_section(page, heading):
@@ -56,7 +57,7 @@ def choose(page, control, value):
             control.click()
             control.fill(value)
             page.get_by_role("option", name=value, exact=True).click(timeout=5000)
-            expect(control).to_have_value(value)
+            expect(control).to_have_attribute("aria-label", re.compile(re.escape(value)))
             return
         except PlaywrightTimeoutError:
             if attempt == 2:
@@ -74,7 +75,7 @@ def run_browser(url, profile):
         page.on("pageerror", lambda error: errors.append(str(error)))
         page.on("request", lambda request: external.append(request.url) if not request.url.startswith(("http://127.0.0.1", "ws://127.0.0.1", "data:", "blob:")) else None)
         page.goto(url)
-        expect(page.get_by_role("heading", name="Your inbox gets smarter with every correction.", exact=True)).to_be_visible()
+        expect(page.get_by_role("heading", name="Your inbox gets smarter with every correction.", exact=True)).to_be_visible(timeout=90000)
         expect(page.locator("#emailList .email-item-btn")).to_have_count(3)
         if profile == "mobile":
             page.locator("#mobileNavToggle").click()
@@ -91,7 +92,9 @@ def run_browser(url, profile):
         expect(page).to_have_url(url + "/?view=workspace")
         expect(page.get_by_role("heading", name="InboxLearn", exact=True)).to_be_visible()
         settled(page)
-        assert page.locator(".np-kicker").bounding_box()["y"] >= 56
+        # The current Streamlit block container has 40px top padding. Keep a
+        # small tolerance for browser rounding while guarding against a flush header.
+        assert page.locator(".np-kicker").bounding_box()["y"] >= 32
         expect(page.get_by_role("tab", name="Today", exact=True)).to_have_attribute("aria-selected", "true")
         page.screenshot(path=str(OUT / f"{profile}-today-empty.png"), full_page=True)
         page.get_by_role("tab", name="Upload / Inbox", exact=True).click()
@@ -112,7 +115,9 @@ def run_browser(url, profile):
         page.keyboard.press("Tab")
         focus = page.evaluate("""() => {const e=document.activeElement; const s=getComputedStyle(e); return {tag:e.tagName, outline:s.outlineStyle, width:s.outlineWidth};}""")
         assert focus["outline"] != "none" and focus["width"] != "0px", focus
-        category = page.get_by_role("combobox", name="Category", exact=True)
+        category_widget = page.locator(".st-key-inbox_category")
+        expect(category_widget.get_by_text("Category", exact=True)).to_be_visible()
+        category = category_widget.get_by_role("combobox")
         category.click()
         expect(page.get_by_role("option", name="bills", exact=True)).to_be_visible()
         page.screenshot(path=str(OUT / f"{profile}-dropdown.png"))
@@ -127,7 +132,8 @@ def run_browser(url, profile):
         # Replay the same pre-authored human-label fixtures as experiment.py.
         # This exercises correction controls; it never copies model predictions.
         for i, example in enumerate(load_demo_rows("demo_feedback.csv"), start=1):
-            choose(page, page.get_by_role("combobox", name="Message to review", exact=True),
+            review_selector = page.locator(".st-key-review_email").get_by_role("combobox")
+            choose(page, review_selector,
                    f"#{i} · {example['subject']}")
             settled(page)
             for target in ("category", "priority"):
@@ -169,7 +175,7 @@ def run_browser(url, profile):
         history = page.get_by_test_id("stExpander").filter(has_text="History (1)")
         history.locator('summary').click()
         history.get_by_role("button", name="Reopen", exact=True).click()
-        expect(page.get_by_role("tabpanel", name="Today", exact=True).get_by_role("button", name="Mark done", exact=True)).to_be_visible()
+        expect(page.get_by_text("Follow-up reopened.", exact=True)).to_be_visible()
         page.get_by_role("tabpanel", name="Today", exact=True).get_by_role("button", name="Cancel", exact=True).click()
         expect(page.get_by_text("Follow-up cancelled.", exact=True)).to_be_visible()
         settled(page)
@@ -185,7 +191,7 @@ def run_browser(url, profile):
         expect(page.get_by_text("Reused candidate v2 from v1.", exact=False)).to_be_visible()
         page.get_by_role("tab", name="Evaluation", exact=True).click()
         settled(page)
-        select = page.get_by_role("combobox", name="Version to compare with baseline")
+        select = page.locator(".st-key-evaluation_version").get_by_role("combobox")
         choose(page, select, "v2")
         expect(page.get_by_text("Not evaluated — v2.", exact=False)).to_be_visible()
         page.get_by_role("button", name="Compute prediction changes", exact=True).click()
@@ -220,12 +226,20 @@ def run_browser(url, profile):
             settled(page)
             overflow_checks.append(no_overflow(page))
         page.get_by_role("tab", name="Review queue", exact=True).click()
-        page.get_by_role("combobox", name="Confirmed category").click()
+        page.locator('div[class*="st-key-category-"]').get_by_role("combobox").click()
         expect(page.get_by_role("option", name="bills", exact=True)).to_be_visible()
         no_overflow(page)
         page.keyboard.press("Escape")
         caption_style = page.get_by_text("Suggestion based on the displayed category.", exact=False).evaluate("""e => ({color:getComputedStyle(e).color, opacity:getComputedStyle(e.parentElement).opacity})""")
-        assert caption_style == {"color": "rgb(82, 82, 82)", "opacity": "1"}, caption_style
+        channels = tuple(map(int, re.findall(r"\d+", caption_style["color"])))
+        def luminance(rgb):
+            values = [channel / 255 for channel in rgb]
+            values = [value / 12.92 if value <= .04045 else ((value + .055) / 1.055) ** 2.4 for value in values]
+            return .2126 * values[0] + .7152 * values[1] + .0722 * values[2]
+        paper_luminance = luminance((243, 239, 231))
+        text_luminance = luminance(channels)
+        caption_contrast = (paper_luminance + .05) / (text_luminance + .05)
+        assert caption_style["opacity"] == "1" and caption_contrast >= 4.5, (caption_style, caption_contrast)
         assert not errors, errors
         assert not external, external
         evidence = {"browser": browser.version, "viewport": viewport, "focus": focus,

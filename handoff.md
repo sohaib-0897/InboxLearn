@@ -198,3 +198,10 @@ When asked to continue:
 - `python -m py_compile app.py` - passed.
 - Fresh Streamlit smoke launch on port 18501 with a disposable `%TEMP%` SQLite database - server reported `0.0.0.0:18501`; HTTP GET `/` returned 200. Server was stopped after the check.
 - The hosted deployment could not be inspected from this workspace. Confirm the Streamlit deployment is configured to run root `app.py` from branch `main`; if startup still fails after restart, capture its first traceback for diagnosis.
+
+### Packaging evidence refresh (2026-09-30)
+
+- Refreshed `docs/screenshots/capture.json` and all 20 desktop/mobile portfolio screenshots using `python scripts/browser_qa.py --portfolio`, so their recorded hashes describe the current Streamlit entry point, styles, theme config, and browser QA script.
+- Updated `scripts/browser_qa.py` selectors and checks for Streamlit's current combobox ARIA state, the current 40px masthead inset, the newsprint palette contrast, and the actual reopen-before-cancel follow-up workflow. Browser waits allow slow first renders and reruns.
+- Browser QA passed at 1440 x 1000 and 390 x 844: the real import, review, correction, follow-up, candidate, prediction diff, evaluation, activation, and rollback flows passed; no page errors, external requests, or horizontal overflow were recorded.
+- `python scripts/package.py` - passed; verified the 86-file archive and all source, fixture, and screenshot fingerprints. `python -m py_compile app.py` remains passed from the Streamlit startup follow-up above.
