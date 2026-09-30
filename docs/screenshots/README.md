@@ -1,8 +1,10 @@
 # Real application captures
 
-Captured from InboxLearn's actual Streamlit UI in Chrome using only the shipped synthetic demo files. These are unedited browser screenshots, not generated mockups. The capture script starts an isolated database for each viewport and completes the native upload, save-and-next, follow-up scheduling, completion, cancellation, reopening, candidate preparation, prediction preview, evaluation, activation and rollback workflow on both.
+Latest capture: 2026-09-30. Captured from InboxLearn's current Streamlit UI in Chrome using only the shipped synthetic demo files. These are unedited browser screenshots, not generated mockups. The capture script starts an isolated database for each viewport and completes the native upload, save-and-next, follow-up scheduling, completion, cancellation, reopening, candidate preparation, prediction preview, evaluation, activation and rollback workflow on both.
 
 The five labels in `data/demo_feedback.csv` are replayed through the review forms. Scores and preview results are checked against `reports/learning.json` before the images are copied here. `capture.json` records browser version, viewports, startup health, verification outcomes and artifact hashes. Captures are illustrative UI views of the synthetic experiment, not evidence of real-world accuracy. Mobile means a Chrome viewport at 390×844; a physical phone was not tested.
+
+The landing image shows the product overview bundled into the Streamlit entry point. The operational workspace is opened from that page or directly with `?view=workspace`. The separate React application uses `/` and `/app`; these screenshots document the native Streamlit app.
 
 | Desktop / mobile capture | View |
 |---|---|

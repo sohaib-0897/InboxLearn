@@ -2,7 +2,7 @@
 
 [Back to the project overview](../README.md)
 
-InboxLearn is a small local Streamlit app and self learning AI agent for human-in-the-loop email classification. It uses Python, SQLite, scikit-learn, and no paid APIs, Gmail integration, sending, deletion, payment, or other external calls.
+InboxLearn is a small local Streamlit app and self learning AI agent for human-in-the-loop email classification. It uses Python, SQLite, and scikit-learn. No paid API is required; optional Gmail intake is read-only. The app never sends or deletes email or makes payments.
 
 The agent predicts five categories (`job opportunities`, `university`, `bills`, `promotions`, `spam`) and three priorities (`low`, `normal`, `high`). It stores the original prediction, uncalibrated confidence estimates, model version, corrections, training lineage, and evaluation results in SQLite. A prediction enters review when either confidence estimate is below its configurable threshold. Suggested next actions are informational only.
 
@@ -58,11 +58,11 @@ The `.venv` directory is local-only and is excluded from `InboxLearn.zip`.
 
 For the direct and numerical dependency versions used by the saved experiment, install with `python -m pip install -r requirements.txt -c constraints-verified.txt` inside the environment. Recorded Python version: 3.12.9. The constraints file is not a complete transitive dependency lock; exact numerical compatibility across other versions/platforms is not promised. No global packages or `aisuite` are needed.
 
-The Newsprint UI requires Streamlit 1.63 or newer, as declared in `requirements.txt`, for the supported theme options and stateful native tabs. The server binds to `127.0.0.1` and usage telemetry is disabled in `.streamlit/config.toml`. Open `http://localhost:8501` after starting it.
+The Newsprint UI requires Streamlit 1.63 or newer, as declared in `requirements.txt`, for the supported theme options and stateful native tabs. The address is left to Streamlit's default binding so hosted Streamlit routing can reach the app; usage telemetry is disabled in `.streamlit/config.toml`. Open `http://localhost:8501` after starting it. The root route shows the product overview; use **Open InboxLearn** or `http://localhost:8501/?view=workspace` for the workspace.
 
 ## Newsprint workspace
 
-The UI uses warm paper, black rules, sharp native controls, serif headings and a static status strip. Tokens live in `assets/newsprint.css` and the native widget theme in `.streamlit/config.toml`. Local Playfair Display, Lora, Inter and JetBrains Mono are used when installed; Georgia, Arial and Consolas/monospace provide offline fallbacks. No remote fonts or custom frontend are needed.
+The UI uses warm paper, ink and rust colors, restrained separators, serif headings and native Streamlit controls. Tokens live in `assets/newsprint.css` and the widget theme in `.streamlit/config.toml`. It uses local Newsreader/Georgia-style display text, Segoe UI/Arial controls, and JetBrains Mono/Consolas labels with system fallbacks. No remote fonts are loaded. See the [current desktop and mobile screenshots](screenshots/README.md).
 
 - **Emails stored** counts all unique imported emails.
 - **Pending reviews** counts unresolved messages originally routed as uncertain.
@@ -155,6 +155,6 @@ Rebuild and verify the source-only archive:
 
 Packaging uses an explicit allowlist for source, synthetic fixtures, measured reports and curated screenshots. It includes the GitHub Actions workflow, `.streamlit/config.toml` and the stylesheet, validates archived files against source, and excludes environments, private emails, runtime data, caches and model binaries. The `.gitignore` keeps runtime files, arbitrary CSVs and the generated ZIP out of Git. `.gitattributes` preserves LF line endings so evidence hashes remain stable across platforms.
 
-Verified locally on Windows / Python 3.12.9 with Streamlit 1.63.0: `115 passed` in pytest (including AppTest and the repeatability/isolation experiment), and isolated `pip check` reported no broken requirements. The [CI workflow](../.github/workflows/ci.yml) checks tests, dependencies and the source/evidence archive on Windows and Ubuntu. Browser verification details and screenshot provenance are recorded in [capture.json](screenshots/capture.json). Mobile checks use a Chrome viewport, not a physical phone. Other browsers, screen readers and real-world generalization remain unverified.
+Verified locally on Windows / Python 3.12.9 with Streamlit 1.63.0: `157 passed` in the latest recorded pytest run (including AppTest and the repeatability/isolation experiment), and isolated `pip check` reported no broken requirements. The [CI workflow](../.github/workflows/ci.yml) checks tests, dependencies and the source/evidence archive on Windows and Ubuntu. Browser verification details and screenshot provenance are recorded in [capture.json](screenshots/capture.json). Mobile checks use a Chrome viewport, not a physical phone. Other browsers, screen readers and real-world generalization remain unverified.
 
 Batch confirmation saves exactly the previewed selection in one transaction. Changed feedback or selection requires a refreshed preview. Failed saves preserve the current form. Action deadlines are optional and explicitly saved; no automatic reminders run in the background. Existing databases receive a transactional additive migration without rewriting model or learning records.

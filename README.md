@@ -4,49 +4,32 @@ A local, human-in-the-loop email triage system featuring incremental linear clas
 
 [![CI](https://github.com/sohaib-0897/InboxLearn/actions/workflows/ci.yml/badge.svg)](https://github.com/sohaib-0897/InboxLearn/actions/workflows/ci.yml)
 
-Production text classifiers inevitably degrade under concept drift and edge-case errors. InboxLearn addresses the engineering lifecycle surrounding those errors: confidence-routed human triage, isolated candidate model training from feedback, side-by-side inbox prediction diffing, and strict evaluation gating before any candidate model can be activated. It runs entirely on local hardware using Python, scikit-learn, SQLite, and Streamlit, with zero external API dependencies and strictly read-only intake.
+Production text classifiers inevitably degrade under concept drift and edge-case errors. InboxLearn addresses the engineering lifecycle surrounding those errors: confidence-routed human triage, isolated candidate model training from feedback, side-by-side inbox prediction diffing, and strict evaluation gating before any candidate model can be activated. Core classification and learning run locally using Python, scikit-learn, SQLite, and Streamlit. No paid API is required; the optional Gmail intake is read-only.
 
-## Portfolio & Agency UI Showcase
+## The application and current screenshots
 
-The repository includes a modern portfolio-grade web client in `frontend/` inspired by the craftsmanship, depth, motion, and visual standards of **basement.studio** and **shadergradient.co**. It communicates directly with the high-performance local FastAPI backend to drive real-time model inference, human triage, pre-activation prediction diffing, evaluation gating, and bit-exact rollback.
+The deployed Streamlit entry point is the root `app.py`. Its default page explains the product; **Open InboxLearn** or `?view=workspace` opens the operational workspace. The Streamlit app uses the existing Python service and SQLite database directly. A separate React client is available in `frontend/` with `/` and `/app` routes through the FastAPI setup.
 
-<p align="center">
-  <img src="docs/screenshots/agency/desktop-01-hero.png" width="100%" alt="InboxLearn Hero with Three.js WebGL Shader and 3D Spring Model Card" />
-</p>
+These current, unedited Chrome captures show the real Streamlit app with the shipped synthetic examples:
 
 <p align="center">
-  <img src="docs/screenshots/agency/desktop-02-inference-aws.png" width="49%" alt="Real-time Inference Studio with probability distributions and latency metrics" />
-  <img src="docs/screenshots/agency/desktop-05-candidate-gate.png" width="49%" alt="Pre-activation diffing and held-out evaluation gate" />
+  <img src="docs/screenshots/desktop-landing.png" width="100%" alt="InboxLearn landing page in the Streamlit app" />
 </p>
 <p align="center">
-  <img src="docs/screenshots/agency/desktop-04-review-desk.png" width="49%" alt="Human review desk with confidence routing and feedback submission" />
-  <img src="docs/screenshots/agency/desktop-06-version-ledger.png" width="49%" alt="Immutable model version ledger with one-click rollback" />
-</p>
-
-*Top: WebGL fluid probability manifold hero with interactive 3D physics-based model architecture tensor card (React Spring) and live telemetry. Middle left: Real-time inference probe with uncalibrated log-loss probability distributions, 4,096-dim stateless feature projection, and entity extraction. Middle right: Candidate model preparation with pre-activation prediction diffing (highlighting training-set membership) and held-out evaluation gating. Bottom left: Human triage desk with confidence threshold routing. Bottom right: Immutable snapshot version ledger with safe IBL1 serialization and bit-exact rollback.*
-
-### Motion Architecture & Stack
-- **Three.js & WebGL Shaders**: Purpose-built continuous probability manifold canvas reacting smoothly to cursor movement and time, equipped with graceful static fallback for reduced-motion and non-WebGL environments.
-- **GSAP + ScrollTrigger**: Hero entrance choreography and scrub-able section transitions across the 6-stage continuous learning lifecycle.
-- **Lenis**: Buttery smooth scrolling synchronized with ScrollTrigger ticks, respecting `prefers-reduced-motion`.
-- **Motion for React (`motion`)**: Fluid UI state transitions, tab navigation with morphing active pills, dialogs, drawers, and feedback submission notifications.
-- **React Spring (`@react-spring/web`)**: 3D physics-driven interactive tensor card with realistic mass, tension, and damping on pointer tilt and drag.
-- **Anime.js**: Micro-interaction metric count-ups (inference latency in ms, feature dimension expansion, and accuracy deltas).
-
-## Editorial Streamlit Interface
-
-In addition to the modern web frontend, the native Newsprint Streamlit application remains fully functional:
-
-<p align="center">
-  <img src="docs/screenshots/desktop-prediction-changes.png" width="49%" alt="Prediction diff comparing active baseline v1 and candidate v2" />
-  <img src="docs/screenshots/desktop-evaluation.png" width="49%" alt="Pre-activation evaluation gate with metric deltas and confusion matrices" />
+  <img src="docs/screenshots/desktop-inbox.png" width="49%" alt="Streamlit inbox with model labels and the selected email" />
+  <img src="docs/screenshots/desktop-review.png" width="49%" alt="Streamlit review queue for confirming category and priority" />
 </p>
 <p align="center">
-  <img src="docs/screenshots/desktop-review.png" width="49%" alt="Review desk for low-confidence messages with Save and Next" />
-  <img src="docs/screenshots/desktop-versions.png" width="49%" alt="Model version ledger with immutable snapshots and rollback" />
+  <img src="docs/screenshots/desktop-prediction-changes.png" width="49%" alt="Candidate and active-model prediction comparison" />
+  <img src="docs/screenshots/desktop-evaluation.png" width="49%" alt="Held-out model evaluation with metric changes" />
+</p>
+<p align="center">
+  <img src="docs/screenshots/mobile-landing.png" width="32%" alt="InboxLearn landing page at a mobile viewport" />
+  <img src="docs/screenshots/mobile-inbox.png" width="32%" alt="Inbox and reading pane at a mobile viewport" />
+  <img src="docs/screenshots/mobile-versions.png" width="32%" alt="Model versions at a mobile viewport" />
 </p>
 
-*Top left: read-only prediction comparison between active baseline and prepared candidate, highlighting training-set membership so memorization is not confused with generalization. Top right: held-out evaluation gate enforcing metric reporting and confusion matrices before activation. Bottom left: triage review desk sorted by lowest confidence with single-click correction. Bottom right: model version ledger tracking lineage, metadata, and one-click rollback.*
+The workflow preserves original model suggestions, records human corrections, prepares an inactive candidate, compares predictions, evaluates it on held-out examples, and supports deliberate activation or rollback. Confidence scores are uncalibrated; the evaluation examples and screenshots are synthetic demonstrations. See the [complete desktop/mobile screenshot index and capture details](docs/screenshots/README.md).
 
 ## Engineering Highlights
 
@@ -113,7 +96,7 @@ The system operates across a seven-stage lifecycle:
 
 1. **Intake & Sanitization**: Incoming emails (from CSV, `.eml`, or `.mbox`) pass through strict size and nesting checks. Text is extracted, HTML is stripped, and metadata (`Date`, `Message-ID`, `In-Reply-To`) is indexed.
 2. **Initial Classification**: The active model bundle transforms message text using a stateless `HashingVectorizer(n_features=4096)` and passes features to two independent `SGDClassifier(loss="log_loss")` models predicting 5 categories (`job opportunities`, `university`, `bills`, `promotions`, `spam`) and 3 priorities (`low`, `normal`, `high`).
-3. **Confidence Routing**: Predictions where either category confidence or priority confidence falls below the configured threshold (defaults: 0.65 for category, 0.60 for priority) are flagged as `needs_review` and routed to the Review Desk.
+3. **Confidence Routing**: Predictions where either category confidence or priority confidence falls below the configured threshold (both default to 0.70) are flagged as `needs_review` and routed to the Review queue.
 4. **Human Feedback Collection**: Operators inspect flagged messages in the Review Queue. Confirming or revising labels writes immutable records into `feedback` and flags original predictions as `corrected`. Batch confirmations are validated against a checksum token to prevent stale submissions.
 5. **Isolated Candidate Preparation**: Clicking **Prepare candidate** initiates training in an exclusive write transaction. If feedback contains revisions to earlier labels, the system rebuilds from the baseline seed plus latest corrections; if all feedback is new, it executes an incremental `partial_fit`. The candidate is stored as an inactive snapshot in `model_versions` (serialized using safe `IBL1` array encoding) and registered in `candidate_registry`.
 6. **Pre-Activation Prediction Diffing**: Operators can diff predictions between the active model and the candidate model across stored inbox emails without altering database records. Each email displays a training-set membership flag to distinguish real generalization from training memorization.
@@ -190,7 +173,7 @@ To evaluate boundary behavior across broader scenario families, [`data/demo_eval
 
 4. **Launch Options:**
 
-   #### Option A: Unified Agency Portfolio Website (FastAPI + Built SPA)
+   #### Option A: FastAPI API and React app (production)
    Run the production API server (serves the REST API and the compiled React + Three.js application simultaneously at `http://127.0.0.1:8000`):
    ```bash
    python scripts/serve_api.py 8000
@@ -206,20 +189,19 @@ To evaluate boundary behavior across broader scenario families, [`data/demo_eval
    ```
    Open **http://localhost:5173** in your browser. The Vite server automatically proxies `/api/*` to the FastAPI backend at port 8000.
 
-   #### Option C: Native Newsprint Streamlit Workspace
+   #### Option C: Native Newsprint Streamlit app
    ```bash
    streamlit run app.py
    ```
-   Open **http://localhost:8501** in your browser. Select **Open InboxLearn** to access the workspace, or navigate directly to **http://localhost:8501/?view=workspace**.
+   Open **http://localhost:8501** in your browser. Select **Open InboxLearn** to access the workspace, or navigate directly to **http://localhost:8501/?view=workspace**. For hosted Streamlit, use the repository-root `app.py` entry point; it runs the Python service directly and does not need the FastAPI/Vite setup.
 
-### Demonstration Walkthrough
-1. Go to **Upload / Inbox** or **Review Desk** and click **Load Demo Fixture (5 Emails)**.
-2. Inspect low-confidence messages, adjust category/priority, and click **Save Feedback**.
-3. Go to **Candidate & Gate** and click **Prepare Candidate Snapshot** (creates inactive model `v2` using safe `IBL1` serialization).
-4. Click **Diff Inbox Predictions** to inspect side-by-side changes (with training-set membership markers).
-5. Click **Run Held-Out Eval** to verify metrics against `demo_eval.csv`.
-6. Click **Activate v2 to Production** (unlocked only after evaluation succeeds!).
-7. Go to **Version Ledger**, click **Roll Back to v1**, and observe instantaneous bit-exact restoration of the baseline state.
+### Demonstration walkthrough
+
+1. Open **Upload / Inbox** and import a CSV, `.eml`, or `.mbox` file, or classify the supplied demonstration sample.
+2. In **Review queue**, inspect the original suggestion and confidence, confirm category and priority, then choose **Save human correction** or **Save and next**.
+3. In **Train / Versions**, prepare an inactive candidate. The active model stays in use.
+4. In **Evaluation**, inspect the read-only prediction changes, then evaluate the candidate on the separate held-out dataset.
+5. Return to **Train / Versions** to activate the evaluated candidate or roll back to an earlier version.
 
 ## Testing
 
@@ -230,7 +212,7 @@ python -m pytest -q
 ```
 
 Test suite coverage:
-- **153 passed tests** across 13 test modules in `tests/`:
+- **157 passed tests** in the latest recorded run across 13 test modules in `tests/`:
   - `test_model_security.py`: Safe `IBL1` serialization, header/checksum verification, corrupted blobs, shape mismatches, oversized payloads, non-finite values, legacy pickle rejection, trusted migration, and rollback.
   - `test_candidates.py`: Candidate preparation, evaluation gating, rollback, and deduplication.
   - `test_learning_integrity.py`: Split isolation, content-leakage prevention, and email-content joins.
@@ -275,9 +257,9 @@ python scripts/browser_qa.py --portfolio
 │   ├── evaluation.py          # Metrics calculation & split isolation checks
 │   └── gmail.py               # Read-only Gmail OAuth connector (optional)
 ├── data/                      # Synthetic CSV splits (seed, feedback, eval, validation, eval_expanded)
-├── tests/                     # 13 test modules (153 automated unit/integration/UI/security tests)
+├── tests/                     # 13 test modules (157 automated unit/integration/UI/security tests in the latest recorded run)
 ├── scripts/                   # Evaluation benchmarks, browser QA, and packaging scripts
-├── docs/                      # Technical documentation & verified screenshots
+├── docs/                      # Technical documentation & current UI screenshots
 │   ├── PROJECT_GUIDE.md       # Detailed architectural and operational guide
 │   └── screenshots/           # Desktop and mobile UI captures with capture.json metadata
 └── reports/                   # Machine-readable evaluation results (JSON & Markdown)

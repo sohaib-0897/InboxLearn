@@ -11,6 +11,18 @@ Self learning AI agent for local email triage, with a Newsprint Streamlit interf
 
 [Measured results and method](reports/learning.md) · [Full-precision JSON](reports/learning.json) · [Reproduction script](scripts/experiment.py) · [Real app screenshots](docs/screenshots/README.md)
 
+## Current application screenshots
+
+The native Streamlit entry point is `app.py`; its default route presents the product overview and `?view=workspace` opens the operational inbox. The captures below are from the real app with isolated databases and synthetic demonstration messages. See the [full desktop/mobile gallery and provenance](docs/screenshots/README.md).
+
+![Streamlit inbox and selected message](docs/screenshots/desktop-inbox.png)
+
+![Streamlit human review queue](docs/screenshots/desktop-review.png)
+
+![Prediction comparison and held-out evaluation](docs/screenshots/desktop-prediction-changes.png)
+
+![Mobile Streamlit workspace](docs/screenshots/mobile-inbox.png)
+
 These numerical results describe only the supplied synthetic demonstration fixtures. They are not real-world accuracy claims or a human-subject evaluation. Labels were pre-authored and replayed through the application's human-feedback API. “Normal” priority remained 0/2 correct, and one university email remained misclassified. Confidence is uncalibrated and all next actions are suggestions only.
 
 The verification fixed a feedback-content join defect and added tests for actual content-based updates and pre-training split isolation. No fixture or model hyperparameter was changed to improve held-out scores. Repeatedly inspected test scores are not an unbiased final benchmark. Independent real-world evaluation, other browsers and screen-reader testing remain future work.

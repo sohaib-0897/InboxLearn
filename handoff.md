@@ -197,7 +197,7 @@ When asked to continue:
 - `python -c "from streamlit import config; print(config.get_option('server.address'))"` - confirmed the effective value is `None` (unset).
 - `python -m py_compile app.py` - passed.
 - Fresh Streamlit smoke launch on port 18501 with a disposable `%TEMP%` SQLite database - server reported `0.0.0.0:18501`; HTTP GET `/` returned 200. Server was stopped after the check.
-- The hosted deployment could not be inspected from this workspace. Confirm the Streamlit deployment is configured to run root `app.py` from branch `main`; if startup still fails after restart, capture its first traceback for diagnosis.
+- The user confirmed the hosted Streamlit deployment runs root `app.py` from `main`. The binding fix was published in commit `269a290`; hosted logs were not available from this workspace.
 
 ### Packaging evidence refresh (2026-09-30)
 
@@ -205,3 +205,9 @@ When asked to continue:
 - Updated `scripts/browser_qa.py` selectors and checks for Streamlit's current combobox ARIA state, the current 40px masthead inset, the newsprint palette contrast, and the actual reopen-before-cancel follow-up workflow. Browser waits allow slow first renders and reruns.
 - Browser QA passed at 1440 x 1000 and 390 x 844: the real import, review, correction, follow-up, candidate, prediction diff, evaluation, activation, and rollback flows passed; no page errors, external requests, or horizontal overflow were recorded.
 - `python scripts/package.py` - passed; verified the 86-file archive and all source, fixture, and screenshot fingerprints. `python -m py_compile app.py` remains passed from the Streamlit startup follow-up above.
+
+### README and screenshot documentation refresh (2026-09-30)
+
+- Replaced obsolete agency-screenshot paths and claims in `README.md` with the current Streamlit landing, inbox, review, evaluation, and mobile captures; clarified the difference between Streamlit's `?view=workspace` and the React app's `/app` route.
+- Updated the README's actual workflow labels and the latest recorded test count. Added current screenshots to `PORTFOLIO.md` and clarified screenshot provenance in `docs/screenshots/README.md`.
+- Corrected `docs/PROJECT_GUIDE.md` to describe the current local font stack, default Streamlit server binding, current route, screenshot gallery, and latest recorded test result.
