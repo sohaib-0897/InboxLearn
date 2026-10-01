@@ -8,7 +8,11 @@ Production text classifiers inevitably degrade under concept drift and edge-case
 
 ## The application and current screenshots
 
-The deployed Streamlit entry point is the root `app.py`. Its default page explains the product; **Open InboxLearn** or `?view=workspace` opens the operational workspace. The Streamlit app uses the existing Python service and SQLite database directly. A separate React client is available in `frontend/` with `/` and `/app` routes through the FastAPI setup.
+The deployed Streamlit entry point is the root `app.py`. Its default page explains the product; **Open InboxLearn** or `?view=workspace` opens the operational workspace. The Streamlit app uses the existing Python service and SQLite database directly. The separate React frontend in `frontend/` has a product landing page at `/` and its operational workspace at `/app`; it connects to the same FastAPI API. The screenshots below document Streamlit, not the React frontend.
+
+### Separate React frontend
+
+The React landing page introduces the email review and model lifecycle. Open **http://localhost:5173/** for the landing page or **http://localhost:5173/app** for the workspace during development. Its source, dependencies, and Vite commands are in `frontend/`; the Streamlit app remains the repository-root `app.py`.
 
 These current, unedited Chrome captures show the real Streamlit app with the shipped synthetic examples:
 
@@ -181,13 +185,18 @@ To evaluate boundary behavior across broader scenario families, [`data/demo_eval
    Open **http://127.0.0.1:8000** in your browser. API docs are available at **http://127.0.0.1:8000/docs**.
 
    #### Option B: Frontend Hot-Reload Development (Vite + React)
-   In a separate terminal, install npm dependencies and launch the Vite development server:
+   Start the API from the repository root in one terminal. Vite's development proxy expects it on port **8080**:
+   ```bash
+   python scripts/serve_api.py 8080
+   ```
+
+   In a second terminal, install the frontend's locked npm dependencies and launch Vite:
    ```bash
    cd frontend
-   npm install
+   npm ci
    npm run dev
    ```
-   Open **http://localhost:5173** in your browser. The Vite server automatically proxies `/api/*` to the FastAPI backend at port 8000.
+   Open **http://localhost:5173/** for the landing page or **http://localhost:5173/app** for the React workspace. Vite proxies `/api/*` to FastAPI at **http://127.0.0.1:8080**. For a production frontend build, run `npm run build` from `frontend/`; the FastAPI production command in Option A serves that compiled app on port 8000.
 
    #### Option C: Native Newsprint Streamlit app
    ```bash

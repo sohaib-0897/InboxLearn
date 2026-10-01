@@ -119,31 +119,31 @@ export const CandidateDiffGate: React.FC<CandidateDiffGateProps> = ({
   const displayedDiffRows = diffData?.rows.filter((r) => (!showChangedOnly ? true : r.changed)) || [];
 
   return (
-    <div className="space-y-8 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+    <div className="workspace-candidate space-y-8 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
       
       {/* Editorial Section Header */}
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 pb-4 border-b border-paper-border">
         <div>
           <div className="flex items-center gap-2 mb-1">
             <span className="font-mono text-[10px] tracking-wider uppercase text-rust font-semibold">
-              02 CANDIDATE & QUALITY GATE
+              02 / MODEL IMPROVEMENT
             </span>
             <span className="text-paper-border">·</span>
             <span className="font-mono text-[10px] text-ink-muted">
-              PRE-ACTIVATION DIFF & HELD-OUT VERIFICATION
+              COMPARE · EVALUATE · DECIDE
             </span>
           </div>
           <h2 className="font-serif text-2xl sm:text-3xl font-bold text-ink">
-            Candidate Snapshot & Quality Gate
+            Candidate & evaluation
           </h2>
           <p className="text-xs text-ink-muted mt-1 max-w-2xl leading-relaxed">
-            Train candidate snapshots from human corrections, inspect pre-activation prediction changes side-by-side (identifying training memorization vs general accuracy), and verify held-out metrics before activating.
+            Prepare from human feedback, compare changed predictions, then evaluate on held-out examples before choosing whether to activate.
           </p>
         </div>
 
         <div className="flex items-center gap-2 font-mono text-xs text-ink-muted bg-paper-sheet border border-paper-border px-3 py-2 shadow-paper-sm">
           <ShieldCheck className="w-4 h-4 text-emerald-800" />
-          <span>Strict Python Gate Enforced</span>
+          <span>Evaluation before activation</span>
         </div>
       </div>
 
@@ -198,13 +198,13 @@ export const CandidateDiffGate: React.FC<CandidateDiffGateProps> = ({
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-paper-border">
           <div>
             <div className="flex items-center gap-2">
-              <span className="font-mono text-[10px] text-rust font-bold">STAGE 2.1</span>
+              <span className="font-mono text-[10px] text-rust font-bold">01 / PREPARE</span>
               <h3 className="font-serif text-lg font-bold text-ink">
                 Prepare Candidate Snapshot
               </h3>
             </div>
             <p className="text-xs text-ink-muted mt-0.5">
-              Snapshot preparation serializes an inactive model candidate to SQLite without altering production traffic.
+              Prepare a candidate from saved feedback. Your active model stays in place until you choose to activate.
             </p>
           </div>
 
@@ -223,7 +223,7 @@ export const CandidateDiffGate: React.FC<CandidateDiffGateProps> = ({
           <div className="p-3 bg-paper-canvas border border-paper-border">
             <span className="text-[10px] text-ink-faint block uppercase">Active Parent</span>
             <strong className="text-sm font-bold text-ink mt-0.5 block">{activeLabel}</strong>
-            <span className="text-[10px] text-ink-muted">Production Baseline</span>
+            <span className="text-[10px] text-ink-muted">Current model</span>
           </div>
 
           <div className="p-3 bg-paper-canvas border border-paper-border">
@@ -241,7 +241,7 @@ export const CandidateDiffGate: React.FC<CandidateDiffGateProps> = ({
             <strong className="text-sm font-bold text-ink mt-0.5 block">
               {candidateInfo ? candidateInfo.feedback_count : 0} items
             </strong>
-            <span className="text-[10px] text-ink-muted">SQLite lineage</span>
+            <span className="text-[10px] text-ink-muted">Model ancestry</span>
           </div>
 
           <div className="p-3 bg-paper-canvas border border-paper-border">
@@ -273,9 +273,9 @@ export const CandidateDiffGate: React.FC<CandidateDiffGateProps> = ({
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-paper-border">
           <div>
             <div className="flex items-center gap-2">
-              <span className="font-mono text-[10px] text-rust font-bold">STAGE 2.2</span>
+              <span className="font-mono text-[10px] text-rust font-bold">02 / COMPARE</span>
               <h3 className="font-serif text-lg font-bold text-ink">
-                Pre-Activation Prediction Diffing
+                Compare predictions
               </h3>
             </div>
             <p className="text-xs text-ink-muted mt-0.5">
@@ -413,18 +413,19 @@ export const CandidateDiffGate: React.FC<CandidateDiffGateProps> = ({
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-paper-border">
           <div>
             <div className="flex items-center gap-2">
-              <span className="font-mono text-[10px] text-rust font-bold">STAGE 2.3</span>
+              <span className="font-mono text-[10px] text-rust font-bold">03 / EVALUATE</span>
               <h3 className="font-serif text-lg font-bold text-ink">
                 Held-Out Evaluation Gate
               </h3>
             </div>
             <p className="text-xs text-ink-muted mt-0.5">
-              Enforce split isolation (NFKC case-folded 0-token overlap). Activation requires verified evaluation against held-out ground truth.
+              Use examples the candidate has not trained on. Review category and priority results before deciding whether to activate.
             </p>
           </div>
 
           <div className="flex flex-wrap items-center gap-2.5">
             <select
+              aria-label="Held-out evaluation dataset"
               value={selectedDataset}
               onChange={(e) => setSelectedDataset(e.target.value as any)}
               className="bg-paper-canvas border border-paper-border px-2.5 py-1.5 text-xs text-ink focus:outline-none focus:border-rust"
@@ -632,13 +633,13 @@ export const CandidateDiffGate: React.FC<CandidateDiffGateProps> = ({
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div>
             <div className="flex items-center gap-2">
-              <span className="font-mono text-[10px] text-rust font-bold">STAGE 2.4</span>
+              <span className="font-mono text-[10px] text-rust font-bold">04 / DECIDE</span>
               <h3 className="font-serif text-lg font-bold text-ink">
-                Production Activation Gate
+                Choose whether to activate
               </h3>
             </div>
             <p className="text-xs text-ink-muted mt-0.5">
-              The service layer strictly requires verified evaluation on the current held-out dataset hash before activating.
+              Activation requires evaluation on the current demo_eval.csv dataset. The expanded dataset adds context but does not unlock activation. Evaluation does not guarantee improvement.
             </p>
           </div>
 

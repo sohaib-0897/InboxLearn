@@ -93,7 +93,7 @@ export const InferenceStudio: React.FC = () => {
 
   const handleDownloadIcs = () => {
     if (!result?.extracted_entities) return;
-    const dateEntity = result.extracted_entities.find((e) => e.type === 'date');
+    const dateEntity = result.extracted_entities.find((e) => ['date', 'date_mention', 'deadline'].includes(e.type));
     if (!dateEntity) return;
 
     const icsContent = [
@@ -115,33 +115,34 @@ export const InferenceStudio: React.FC = () => {
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+    URL.revokeObjectURL(link.href);
   };
 
   return (
-    <div className="space-y-6 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+    <div className="workspace-probe space-y-6 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
       
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 pb-4 border-b border-paper-border">
         <div>
           <div className="flex items-center gap-2 mb-1">
             <span className="font-mono text-[10px] tracking-wider uppercase text-rust font-semibold">
-              03 INFERENCE PROBE BENCH
+              03 / TRY A MESSAGE
             </span>
             <span className="text-paper-border">·</span>
             <span className="font-mono text-[10px] text-ink-muted">
-              4,096-DIM STATELESS FEATURE PROJECTION
+              PREDICTIONS WITHOUT SAVING
             </span>
           </div>
           <h2 className="font-serif text-2xl sm:text-3xl font-bold text-ink">
-            Interactive Model Inference Probe
+            Inference probe
           </h2>
           <p className="text-xs text-ink-muted mt-1 max-w-2xl leading-relaxed">
-            Test the active classifier bundle on arbitrary email text. Inspect uncalibrated log-loss probability distributions, stateless hashing projection, and regex entity extraction.
+            Try an email before importing it. See how the active model classifies it, adjust review thresholds, and inspect dates or amounts it finds.
           </p>
         </div>
 
         <div className="font-mono text-xs text-ink-muted bg-paper-sheet border border-paper-border px-3 py-2 shadow-paper-sm">
-          <span>Vector: HashingVectorizer(n=4096, 1-2 ngrams)</span>
+          <span>Try a message without adding it to your inbox</span>
         </div>
       </div>
 
@@ -408,7 +409,7 @@ export const InferenceStudio: React.FC = () => {
                     <span className="text-[10px] font-mono uppercase text-ink-faint block font-semibold">
                       Extracted Entities
                     </span>
-                    {result.has_calendar_event && (
+                    {result.extracted_entities.some((entity) => ['date', 'date_mention', 'deadline'].includes(entity.type)) && (
                       <button
                         onClick={handleDownloadIcs}
                         className="inline-flex items-center gap-1 text-[11px] font-mono text-rust hover:underline cursor-pointer"

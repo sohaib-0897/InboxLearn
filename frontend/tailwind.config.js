@@ -44,9 +44,9 @@ export default {
         }
       },
       fontFamily: {
-        serif: ['Newsreader', 'Sitka Text', 'Palatino Linotype', 'Book Antiqua', 'Georgia', 'serif'],
-        sans: ['"Plus Jakarta Sans"', '"Source Sans 3"', '"Segoe UI"', 'system-ui', 'sans-serif'],
-        mono: ['"JetBrains Mono"', '"SF Mono"', 'Consolas', 'monospace'],
+        serif: ['"Palatino Linotype"', '"Book Antiqua"', 'Georgia', 'serif'],
+        sans: ['"Segoe UI"', 'system-ui', 'sans-serif'],
+        mono: ['Consolas', '"SF Mono"', 'monospace'],
       },
       borderRadius: {
         none: '0px',

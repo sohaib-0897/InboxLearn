@@ -57,31 +57,31 @@ export const VersionLedger: React.FC<{ onRollback?: () => void }> = ({ onRollbac
   };
 
   return (
-    <div className="space-y-6 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+    <div className="workspace-ledger space-y-6 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
       
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 pb-4 border-b border-paper-border">
         <div>
           <div className="flex items-center gap-2 mb-1">
             <span className="font-mono text-[10px] tracking-wider uppercase text-rust font-semibold">
-              04 VERSION LEDGER
+              04 / YOUR MODEL HISTORY
             </span>
             <span className="text-paper-border">·</span>
             <span className="font-mono text-[10px] text-ink-muted">
-              IMMUTABLE SNAPSHOTS & EXACT ROLLBACK
+              A RECORD OF EVERY STEP
             </span>
           </div>
           <h2 className="font-serif text-2xl sm:text-3xl font-bold text-ink">
-            Model Lineage & Rollback Ledger
+            Version history & rollback
           </h2>
           <p className="text-xs text-ink-muted mt-1 max-w-2xl leading-relaxed">
-            Historical models are persisted as immutable snapshots in SQLite using safe IBL1 serialization (validated float64 arrays, class names, step counters, and SHA-256 digests). Any version can be restored with bit-exact reproducibility.
+            Inspect saved model snapshots and their evaluation records. Restore a previous version when you need to reverse an activation; your feedback stays in the ledger.
           </p>
         </div>
 
         <div className="flex items-center gap-2 font-mono text-xs text-ink-muted bg-paper-sheet border border-paper-border px-3 py-2 shadow-paper-sm">
           <ShieldCheck className="w-4 h-4 text-emerald-800" />
-          <span>IBL1 Safe Serialization · Zero Pickle Blobs</span>
+          <span>Saved versions. A way back.</span>
         </div>
       </div>
 
@@ -120,8 +120,8 @@ export const VersionLedger: React.FC<{ onRollback?: () => void }> = ({ onRollbac
       {/* Ledger Table Container */}
       <div className="bg-paper-sheet border border-paper-border shadow-paper overflow-hidden">
         <div className="px-4 py-2.5 bg-paper-subtle border-b-2 border-ink flex items-center justify-between text-[11px] font-mono uppercase tracking-wider text-ink font-semibold">
-          <span>Snapshot Version History ({versions.length})</span>
-          <span className="text-[10px] text-ink-faint lowercase tracking-normal">click to roll back</span>
+          <span>Snapshot Version History ({loadError ? 'unavailable' : isLoading ? 'loading' : versions.length})</span>
+          <span className="text-[10px] text-ink-faint lowercase tracking-normal">Scroll for details and rollback</span>
         </div>
 
         {isLoading && <div className="workspace-empty-state" role="status">Loading saved model versions…</div>}
@@ -171,12 +171,12 @@ export const VersionLedger: React.FC<{ onRollback?: () => void }> = ({ onRollbac
 
                     {/* Training Mode */}
                     <td className="p-3 font-mono text-ink">
-                      <span>{ver.metadata?.training_mode || 'seed'}</span>
+                      <span>{ver.metadata?.training_mode?.replace(/_/g, ' ') || 'Not recorded'}</span>
                     </td>
 
                     {/* Composition */}
                     <td className="p-3 font-mono text-ink-muted">
-                      <span>{ver.metadata?.seed_count ?? 15} seed · {ver.metadata?.feedback_count ?? 0} feedback</span>
+                      <span>{ver.metadata?.seed_count ?? '—'} seed · {ver.metadata?.feedback_count ?? '—'} feedback</span>
                     </td>
 
                     {/* Timestamp */}

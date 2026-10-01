@@ -1,4 +1,6 @@
 import React from 'react';
+import { motion } from 'motion/react';
+import { useMotionPreference } from '../useMotionPreference';
 import { Link } from 'react-router-dom';
 import { Inbox, GitCompare, History, Terminal, BookOpen, ArrowUpRight } from 'lucide-react';
 import { StatusResponse } from '../api/client';
@@ -22,6 +24,7 @@ const NAV_ITEMS: { id: TabId; number: string; label: string; icon: React.FC<{ cl
 ];
 
 export const Navbar: React.FC<NavbarProps> = ({ activeTab, setActiveTab, status, statusLoading, statusError }) => {
+  const reducedMotion = useMotionPreference();
   const activeModel = status?.active_version;
   const metrics = status?.metrics;
   const connectedLabel = status ? 'API connected' : statusLoading ? 'Connecting to local API' : 'Local API unavailable';
@@ -33,11 +36,11 @@ export const Navbar: React.FC<NavbarProps> = ({ activeTab, setActiveTab, status,
           <span className="workspace-brand-mark" aria-hidden="true"><Inbox /></span>
           <span>InboxLearn</span>
         </Link>
-        <p className="workspace-rail-caption">LOCAL EMAIL TRIAGE<br />HUMAN REVIEW · MODEL CONTROL</p>
+        <p className="workspace-rail-caption">A little intelligence.<br />A human touch.</p>
       </div>
 
       <nav className="workspace-nav" aria-label="Workspace sections">
-        <span className="workspace-nav-label">WORKSPACE</span>
+        <span className="workspace-nav-label">YOUR DESK</span>
         {NAV_ITEMS.map((item) => {
           const Icon = item.icon;
           const isActive = activeTab === item.id;
@@ -57,16 +60,16 @@ export const Navbar: React.FC<NavbarProps> = ({ activeTab, setActiveTab, status,
         })}
       </nav>
 
-      <div className="workspace-rail-note" aria-hidden="true">
-        <div className="workspace-rail-orbit"><span /><span /><i /></div>
-        <p>Better inbox decisions,<br /><strong>smarter models.</strong></p>
-        <span className="workspace-rail-note-index">A HUMAN-LED LEARNING LOOP</span>
+      <div className="workspace-rail-note">
+        <span className="rail-note-line" aria-hidden="true" />
+        <p>Every correction<br /><em>is a conversation.</em></p>
+        <span className="workspace-rail-note-index">Review first. Learn from there.</span>
       </div>
 
       <section className="workspace-model-status" aria-label="Live workspace status">
         <div className="workspace-model-status-heading">
           <span className={`workspace-connection-dot ${status ? 'is-connected' : statusError ? 'is-offline' : 'is-pending'}`} aria-hidden="true" />
-          <span>{connectedLabel}</span>
+          <motion.span key={connectedLabel} role="status" initial={{ opacity: reducedMotion ? 1 : .7 }} animate={{ opacity: 1 }} transition={{ duration: reducedMotion ? 0 : .15 }}>{connectedLabel}</motion.span>
         </div>
         <div className="workspace-model-line">
           <span>ACTIVE MODEL</span>

@@ -82,7 +82,7 @@ const ENGINEERING_GUARANTEES = [
 
 export const PipelineLifecycle: React.FC = () => {
   return (
-    <div className="space-y-8 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+    <div className="workspace-lifecycle space-y-8 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
       
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 pb-4 border-b border-paper-border">
@@ -97,7 +97,7 @@ export const PipelineLifecycle: React.FC = () => {
             </span>
           </div>
           <h2 className="font-serif text-2xl sm:text-3xl font-bold text-ink">
-            Architecture & Engineering Principles
+            How the learning loop works
           </h2>
           <p className="text-xs text-ink-muted mt-1 max-w-2xl leading-relaxed">
             InboxLearn runs entirely on local hardware with zero external cloud dependencies. Below is the 6-stage lifecycle and the explicit guarantees that ensure reliability, data isolation, and safety.

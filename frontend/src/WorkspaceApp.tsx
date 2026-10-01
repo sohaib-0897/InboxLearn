@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import './redesign.css';
 import { api, StatusResponse } from './api/client';
 import { Navbar, TabId } from './components/Navbar';
 import { ReviewDesk } from './components/ReviewDesk';
@@ -24,6 +25,7 @@ export function WorkspaceApp() {
       const data = await api.getStatus();
       setStatus(data);
     } catch (err) {
+      setStatus(null);
       setStatusError(err instanceof Error ? err.message : 'The local API could not be reached.');
     } finally {
       setIsInitializing(false);
@@ -47,6 +49,7 @@ export function WorkspaceApp() {
       />
 
       <div className="workspace-content">
+        <header className="desk-topbar"><span>Your workspace <span aria-hidden="true">/</span> <strong>{{inbox: 'Inbox & review', candidate: 'Candidate & evaluation', probe: 'Inference probe', ledger: 'Version history', architecture: 'How it works'}[activeTab]}</strong></span><span className="desk-topbar-status">{status ? `${status.metrics.available_feedback} saved feedback ${status.metrics.available_feedback === 1 ? 'record' : 'records'}` : isInitializing ? 'Connecting…' : 'Connection unavailable'}</span></header>
         {statusError && (
           <div className="workspace-connection" role="status" aria-live="polite">
             <span><strong>Local API unavailable.</strong> {statusError}</span>
@@ -55,10 +58,12 @@ export function WorkspaceApp() {
         )}
 
         <main className="workspace-main flex-1 w-full pb-12" id="main-content" tabIndex={-1}>
+        <h1 className="sr-only">InboxLearn workspace</h1>
         {activeTab === 'inbox' && (
             <div key="inbox">
               <ReviewDesk 
-                onFeedbackSaved={refreshStatus} 
+                onFeedbackSaved={refreshStatus}
+                onOpenCandidate={() => { setActiveTab('candidate'); document.getElementById('main-content')?.focus(); }}
                 status={status}
               />
             </div>
@@ -101,26 +106,7 @@ export function WorkspaceApp() {
         )}
         </main>
 
-      {/* Colophon Footer */}
-        <footer className="border-t-2 border-ink bg-paper-subtle py-6 px-4 sm:px-6 lg:px-8 text-xs font-mono text-ink-muted">
-        <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
-          <div className="flex items-center gap-2">
-            <span className="font-serif font-bold text-ink text-sm">InboxLearn</span>
-            <span>·</span>
-            <span>Local email triage</span>
-            <span>·</span>
-            <span>Human-reviewed learning loop</span>
-          </div>
-
-          <div className="flex flex-wrap items-center gap-3 text-[11px] text-ink-faint">
-            <span>SQLite feedback ledger</span>
-            <span>·</span>
-            <span>Evaluated model versions</span>
-            <span>·</span>
-            <span>Reversible activation</span>
-          </div>
-        </div>
-        </footer>
+        <footer className="desk-footer"><span>InboxLearn<span className="brand-period">.</span></span><p>Human judgment, at the heart of the loop.</p><span>Review · Evaluate · Decide</span></footer>
       </div>
     </div>
   );

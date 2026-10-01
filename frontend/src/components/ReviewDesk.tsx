@@ -1,4 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { motion } from 'motion/react';
+import { useMotionPreference } from '../useMotionPreference';
 import { 
   Inbox, 
   AlertCircle, 
@@ -23,10 +25,12 @@ import { api, EmailRow, StatusResponse } from '../api/client';
 
 interface ReviewDeskProps {
   onFeedbackSaved?: () => void;
+  onOpenCandidate?: () => void;
   status?: StatusResponse | null;
 }
 
-export const ReviewDesk: React.FC<ReviewDeskProps> = ({ onFeedbackSaved, status }) => {
+export const ReviewDesk: React.FC<ReviewDeskProps> = ({ onFeedbackSaved, onOpenCandidate, status }) => {
+  const reducedMotion = useMotionPreference();
   const [emails, setEmails] = useState<EmailRow[]>([]);
   const [selectedEmailId, setSelectedEmailId] = useState<number | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -46,8 +50,42 @@ export const ReviewDesk: React.FC<ReviewDeskProps> = ({ onFeedbackSaved, status 
   // Mobile view state: list vs detail
   const [mobileDetailOpen, setMobileDetailOpen] = useState(false);
   const uploadInputRef = useRef<HTMLInputElement>(null);
+  const detailHeadingRef = useRef<HTMLHeadingElement>(null);
+  const rowRefs = useRef<Record<number, HTMLDivElement | null>>({});
+  const focusDetail = useRef(false);
+  const loadSequence = useRef(0);
+  const returnFrame = useRef<number>();
+  const saveButtonRef = useRef<HTMLButtonElement>(null);
+  const saveFocusFrame = useRef<number>();
+
+  useEffect(() => () => {
+    if (returnFrame.current !== undefined) cancelAnimationFrame(returnFrame.current);
+    if (saveFocusFrame.current !== undefined) cancelAnimationFrame(saveFocusFrame.current);
+    loadSequence.current++;
+  }, []);
+
+  const selectEmail = (emailId: number) => {
+    focusDetail.current = window.matchMedia('(max-width: 1023px)').matches;
+    setSelectedEmailId(emailId);
+    setMobileDetailOpen(true);
+  };
+
+  useEffect(() => {
+    if (!focusDetail.current || !mobileDetailOpen) return;
+    focusDetail.current = false;
+    detailHeadingRef.current?.focus();
+  }, [mobileDetailOpen, selectedEmailId]);
+
+  const returnToList = () => {
+    setMobileDetailOpen(false);
+    if (returnFrame.current !== undefined) cancelAnimationFrame(returnFrame.current);
+    returnFrame.current = requestAnimationFrame(() => {
+      if (selectedEmailId) rowRefs.current[selectedEmailId]?.focus();
+    });
+  };
 
   const loadEmails = async () => {
+    const sequence = ++loadSequence.current;
     setIsLoading(true);
     try {
       const res = await api.getInbox({
@@ -57,12 +95,32 @@ export const ReviewDesk: React.FC<ReviewDeskProps> = ({ onFeedbackSaved, status 
         priority: priorityFilter,
         unresolved: queueView === 'review',
       });
+      if (sequence !== loadSequence.current) return;
       setLoadError(null);
+      // Inbox responses expose the original prediction as category/priority.
+      // Keep the API contract intact and normalize only the reading view.
+      const rows = res.rows.map((row) => {
+        const original = row as EmailRow & { category?: string; priority?: string };
+        return {
+          ...row,
+          predicted_category: row.predicted_category ?? original.category ?? 'Unavailable',
+          predicted_priority: row.predicted_priority ?? original.priority ?? 'Unavailable',
+          entities: row.entities?.map((entity) => {
+            const stored = entity as typeof entity & { entity_type?: string; entity_value?: string; source_phrase?: string };
+            return {
+              ...entity,
+              type: entity.type ?? stored.entity_type ?? 'Unavailable',
+              value: entity.value ?? stored.entity_value ?? 'Unavailable',
+              raw_phrase: entity.raw_phrase ?? stored.source_phrase ?? '',
+            };
+          }),
+        };
+      });
       const visibleRows = queueView === 'review'
-        ? res.rows.filter((row) => row.status === 'needs_review' && !row.feedback_id)
+        ? rows.filter((row) => row.status === 'needs_review' && !row.feedback_id)
         : queueView === 'resolved'
-          ? res.rows.filter((row) => row.status !== 'needs_review' || Boolean(row.feedback_id))
-          : res.rows;
+          ? rows.filter((row) => row.status !== 'needs_review' || Boolean(row.feedback_id))
+          : rows;
       setEmails(visibleRows);
 
       // Initialize drafts for each row
@@ -73,7 +131,7 @@ export const ReviewDesk: React.FC<ReviewDeskProps> = ({ onFeedbackSaved, status 
           priority: r.effective_priority,
         };
       });
-      setDrafts(initialDrafts);
+      setDrafts((previous) => ({ ...initialDrafts, ...previous }));
 
       // Auto-select first email if none selected or if selected is no longer in list
       if (visibleRows.length > 0) {
@@ -84,10 +142,11 @@ export const ReviewDesk: React.FC<ReviewDeskProps> = ({ onFeedbackSaved, status 
         setSelectedEmailId(null);
       }
     } catch (err) {
+      if (sequence !== loadSequence.current) return;
       console.error('Failed to load inbox emails', err);
       setLoadError(err instanceof Error ? err.message : 'Inbox could not be loaded.');
     } finally {
-      setIsLoading(false);
+      if (sequence === loadSequence.current) setIsLoading(false);
     }
   };
 
@@ -132,6 +191,7 @@ export const ReviewDesk: React.FC<ReviewDeskProps> = ({ onFeedbackSaved, status 
   const handleSaveCorrection = async (emailId: number) => {
     const draft = drafts[emailId];
     if (!draft) return;
+    const restoreFocus = document.activeElement === saveButtonRef.current;
     setIsSaving(true);
     setSaveSuccessNotice(null);
     setSaveErrorNotice(null);
@@ -146,6 +206,13 @@ export const ReviewDesk: React.FC<ReviewDeskProps> = ({ onFeedbackSaved, status 
       setSaveErrorNotice(err.message || 'Correction could not be saved.');
     } finally {
       setIsSaving(false);
+      if (restoreFocus) {
+        saveFocusFrame.current = requestAnimationFrame(() => {
+          if (document.activeElement === document.body && saveButtonRef.current?.dataset.emailId === String(emailId)) {
+            saveButtonRef.current.focus({ preventScroll: true });
+          }
+        });
+      }
     }
   };
 
@@ -156,25 +223,25 @@ export const ReviewDesk: React.FC<ReviewDeskProps> = ({ onFeedbackSaved, status 
   const priorities = status?.priorities || ['high', 'normal', 'low'];
 
   return (
-    <div className="workspace-review-desk space-y-6 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+    <div className={`workspace-review-desk space-y-6 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6${mobileDetailOpen ? " is-reading" : ""}`}>
       
       {/* Editorial Section Header */}
       <div className="workspace-review-heading flex flex-col md:flex-row md:items-end justify-between gap-4 pb-4 border-b border-paper-border">
         <div>
           <div className="flex items-center gap-2 mb-1">
             <span className="font-mono text-[10px] tracking-wider uppercase text-rust font-semibold">
-            01 / INBOX
+            YOUR DAILY CORRESPONDENCE
             </span>
             <span className="text-paper-border">·</span>
             <span className="font-mono text-[10px] text-ink-muted">
-            EMAIL TRIAGE · HUMAN REVIEW
+            REVIEW DESK
             </span>
           </div>
           <h2 className="font-serif text-2xl sm:text-3xl font-bold text-ink">
-            Inbox &amp; Review
+            Your review desk.
           </h2>
           <p className="text-xs text-ink-muted mt-1 max-w-2xl leading-relaxed">
-            Scan model suggestions, check uncertain messages, and record the labels you want the next candidate to learn from.
+            Read, confirm, or correct. Every saved decision is useful feedback for your next model.
           </p>
         </div>
 
@@ -183,6 +250,7 @@ export const ReviewDesk: React.FC<ReviewDeskProps> = ({ onFeedbackSaved, status 
           <input
             ref={uploadInputRef}
             className="sr-only"
+            tabIndex={-1}
             type="file"
             accept=".eml,.mbox,.csv,message/rfc822,text/csv"
             aria-label="Choose email file to import"
@@ -203,7 +271,7 @@ export const ReviewDesk: React.FC<ReviewDeskProps> = ({ onFeedbackSaved, status 
             className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-sans font-medium bg-paper-sheet hover:bg-paper-subtle border border-paper-border text-ink shadow-paper-sm transition-colors cursor-pointer disabled:opacity-50"
           >
             <RefreshCw className={`w-3.5 h-3.5 text-rust ${isLoading ? 'animate-spin' : ''}`} />
-            <span>Load Demo Fixture (5 Emails)</span>
+            <span>Try 5 demo emails</span>
           </button>
 
           <a
@@ -231,7 +299,7 @@ export const ReviewDesk: React.FC<ReviewDeskProps> = ({ onFeedbackSaved, status 
       )}
 
       {saveSuccessNotice && (
-        <div className="p-3 bg-emerald-50 border-l-3 border-emerald-700 border-y border-r border-emerald-200 text-xs text-emerald-950 flex items-center justify-between shadow-paper-sm">
+        <motion.div role="status" initial={{ opacity: reducedMotion ? 1 : .4 }} animate={{ opacity: 1 }} className="desk-save-notice">
           <div className="flex items-center gap-2">
             <CheckCircle2 className="w-4 h-4 text-emerald-700 flex-shrink-0" />
             <span>{saveSuccessNotice}</span>
@@ -239,7 +307,8 @@ export const ReviewDesk: React.FC<ReviewDeskProps> = ({ onFeedbackSaved, status 
           <button onClick={() => setSaveSuccessNotice(null)} className="text-emerald-800 hover:text-emerald-950 text-xs underline cursor-pointer">
             Dismiss
           </button>
-        </div>
+          <div className="desk-followup"><span>Keep reviewing, or see what your feedback could change.</span>{emails.some(e => e.id !== selectedEmailId && !e.feedback_id) && <button type="button" onClick={() => { const next = emails.find(e => e.id !== selectedEmailId && !e.feedback_id); if (next) selectEmail(next.id); }}>Next unreviewed message <ChevronRight size={15} aria-hidden="true" /></button>}<button type="button" onClick={onOpenCandidate}>Compare a candidate <ChevronRight size={15} aria-hidden="true" /></button></div>
+        </motion.div>
       )}
 
       {saveErrorNotice && (
@@ -273,8 +342,9 @@ export const ReviewDesk: React.FC<ReviewDeskProps> = ({ onFeedbackSaved, status 
         <div className="flex flex-wrap items-center gap-3">
           {/* Order Selector */}
           <div className="flex items-center gap-1.5">
-            <span className="text-ink-faint font-mono text-[11px]">ORDER:</span>
+            <label htmlFor="inbox-order" className="text-ink-faint font-mono text-[11px]">Order</label>
             <select
+              id="inbox-order"
               value={order}
               onChange={(e) => setOrder(e.target.value)}
               className="bg-paper-canvas border border-paper-border px-2 py-1 text-xs text-ink focus:outline-none focus:border-rust"
@@ -286,8 +356,9 @@ export const ReviewDesk: React.FC<ReviewDeskProps> = ({ onFeedbackSaved, status 
 
           {/* Category Filter */}
           <div className="flex items-center gap-1.5">
-            <span className="text-ink-faint font-mono text-[11px]">CATEGORY:</span>
+            <label htmlFor="inbox-category" className="text-ink-faint font-mono text-[11px]">Category</label>
             <select
+              id="inbox-category"
               value={categoryFilter}
               onChange={(e) => setCategoryFilter(e.target.value)}
               className="bg-paper-canvas border border-paper-border px-2 py-1 text-xs text-ink focus:outline-none focus:border-rust"
@@ -301,8 +372,9 @@ export const ReviewDesk: React.FC<ReviewDeskProps> = ({ onFeedbackSaved, status 
 
           {/* Priority Filter */}
           <div className="flex items-center gap-1.5">
-            <span className="text-ink-faint font-mono text-[11px]">PRIORITY:</span>
+            <label htmlFor="inbox-priority" className="text-ink-faint font-mono text-[11px]">Priority</label>
             <select
+              id="inbox-priority"
               value={priorityFilter}
               onChange={(e) => setPriorityFilter(e.target.value)}
               className="bg-paper-canvas border border-paper-border px-2 py-1 text-xs text-ink focus:outline-none focus:border-rust"
@@ -317,7 +389,7 @@ export const ReviewDesk: React.FC<ReviewDeskProps> = ({ onFeedbackSaved, status 
         </div>
 
         <div className="workspace-inbox-count" aria-live="polite">
-          Showing <strong>{emails.length}</strong> message{emails.length === 1 ? '' : 's'}
+          {loadError ? 'Message count unavailable' : isLoading ? 'Refreshing messages…' : <>Showing <strong>{emails.length}</strong> message{emails.length === 1 ? '' : 's'}</>}
         </div>
         </div>
       </div>
@@ -335,12 +407,14 @@ export const ReviewDesk: React.FC<ReviewDeskProps> = ({ onFeedbackSaved, status 
             <div className="workspace-message-list-heading">
               <div className="flex items-center gap-2">
                 <span>Inbox Messages</span>
-                <span className="text-ink-muted font-normal">({emails.length})</span>
+                <span className="text-ink-muted font-normal">{loadError ? '(unavailable)' : isLoading ? '(loading)' : `(${emails.length})`}</span>
               </div>
               <span className="text-[10px] text-ink-faint lowercase tracking-normal">click to inspect & confirm</span>
             </div>
 
             {/* Empty State */}
+            {loadError && emails.length === 0 && <div className="workspace-empty-state">Messages could not be reached. Retry the inbox request above.</div>}
+            {loadError && emails.length > 0 && <p className="workspace-empty-state">Showing the last loaded messages. Refresh failed; labels may be out of date.</p>}
             {isLoading && emails.length === 0 && (
               <div className="workspace-empty-state" role="status">Loading messages from the local inbox…</div>
             )}
@@ -348,20 +422,20 @@ export const ReviewDesk: React.FC<ReviewDeskProps> = ({ onFeedbackSaved, status 
             {emails.length === 0 && !isLoading && !loadError && (
               <div className="p-8 text-center space-y-3">
                 <Inbox className="w-8 h-8 text-ink-faint mx-auto" />
-                <p className="font-serif text-lg text-ink font-semibold">No emails match the selected filters.</p>
+                <p className="font-serif text-lg text-ink font-semibold">{status?.metrics.emails_stored === 0 ? 'Your desk is ready for its first message.' : 'No messages in this view.'}</p>
                 <p className="text-xs text-ink-muted max-w-md mx-auto">
                   {queueView === 'review'
                     ? 'No uncertain messages are waiting for a human decision.'
                     : queueView === 'resolved'
                       ? 'No classified or corrected messages in this view yet.'
-                      : 'Your inbox currently has no imported messages.'}
+                      : status?.metrics.emails_stored === 0 ? 'Import an email file above, or get a feel for the workflow with five synthetic emails.' : 'Try another category or priority to find the message you need.'}
                 </p>
                 <button
                   onClick={handleImportDemo}
                   className="mt-2 inline-flex items-center gap-2 px-4 py-2 text-xs font-sans font-medium bg-rust text-white hover:bg-rust-hover transition-colors cursor-pointer"
                 >
                   <RefreshCw className="w-3.5 h-3.5" />
-                  <span>Load Demo Fixture (5 Synthetic Emails)</span>
+                  <span>Explore with synthetic emails</span>
                 </button>
               </div>
             )}
@@ -376,15 +450,12 @@ export const ReviewDesk: React.FC<ReviewDeskProps> = ({ onFeedbackSaved, status 
                 return (
                   <div
                     key={email.id}
-                    onClick={() => {
-                      setSelectedEmailId(email.id);
-                      setMobileDetailOpen(true);
-                    }}
+                    ref={(element) => { rowRefs.current[email.id] = element; }}
+                    onClick={() => selectEmail(email.id)}
                     onKeyDown={(e) => {
                       if (e.key === 'Enter' || e.key === ' ') {
                         e.preventDefault();
-                        setSelectedEmailId(email.id);
-                        setMobileDetailOpen(true);
+                        selectEmail(email.id);
                       }
                     }}
                     tabIndex={0}
@@ -457,7 +528,7 @@ export const ReviewDesk: React.FC<ReviewDeskProps> = ({ onFeedbackSaved, status 
                     {/* Model Suggestions / Current Labels */}
                     <div className="mt-2.5 pt-2 border-t border-dashed border-paper-border flex flex-wrap items-center justify-between gap-2 text-xs">
                       <div className="flex items-center gap-1.5">
-                        <span className="text-[10px] font-mono uppercase text-ink-faint">Label:</span>
+                        <span className="text-[10px] font-mono uppercase text-ink-faint">{email.feedback_id ? 'Human:' : 'Model:'}</span>
                         <span className="px-1.5 py-0.5 bg-paper-sheet border border-paper-border font-mono text-[11px] text-ink font-medium">
                           {email.effective_category}
                         </span>
@@ -488,7 +559,7 @@ export const ReviewDesk: React.FC<ReviewDeskProps> = ({ onFeedbackSaved, status 
               {/* Mobile Back Button */}
               <div className="lg:hidden pb-3 border-b border-paper-border">
                 <button
-                  onClick={() => setMobileDetailOpen(false)}
+                  onClick={returnToList}
                   className="inline-flex items-center gap-1 text-xs font-mono text-rust hover:underline cursor-pointer"
                 >
                   <ArrowLeft className="w-3.5 h-3.5" />
@@ -521,7 +592,7 @@ export const ReviewDesk: React.FC<ReviewDeskProps> = ({ onFeedbackSaved, status 
                   )}
                 </div>
 
-                <h3 className="font-serif text-xl sm:text-2xl font-bold text-ink leading-snug">
+                <h3 ref={detailHeadingRef} tabIndex={-1} className="font-serif text-xl sm:text-2xl font-bold text-ink leading-snug">
                   {selectedEmail.subject}
                 </h3>
 
@@ -543,7 +614,7 @@ export const ReviewDesk: React.FC<ReviewDeskProps> = ({ onFeedbackSaved, status 
               {/* Email Body Content */}
               <div className="workspace-message-body space-y-2">
                 <span className="text-[10px] font-mono uppercase text-ink-faint block">
-                  Email Body Content
+                  THE MESSAGE
                 </span>
                 <div className="workspace-message-copy p-3.5 bg-paper-canvas border border-paper-border text-xs sm:text-sm text-ink-light font-sans whitespace-pre-wrap leading-relaxed select-text max-h-60 overflow-y-auto">
                   {selectedEmail.body}
@@ -555,7 +626,7 @@ export const ReviewDesk: React.FC<ReviewDeskProps> = ({ onFeedbackSaved, status 
                 <div className="workspace-extracted-entities p-3 bg-paper-subtle border border-paper-border space-y-1.5 text-xs">
                   <span className="text-[10px] font-mono uppercase text-ink font-semibold flex items-center gap-1.5">
                     <Tag className="w-3 h-3 text-rust" />
-                    <span>Extracted Entities</span>
+                    <span>Dates &amp; details found</span>
                   </span>
                   <div className="flex flex-wrap gap-1.5 pt-1">
                     {selectedEmail.entities.map((ent, idx) => (
@@ -603,9 +674,10 @@ export const ReviewDesk: React.FC<ReviewDeskProps> = ({ onFeedbackSaved, status 
               {/* HUMAN CONFIRMATION & FEEDBACK DESK CONTROLS                      */}
               {/* ================================================================= */}
               <div className="workspace-correction-panel p-4 bg-paper-subtle border-2 border-ink space-y-3.5">
+                {selectedEmail.feedback_id && <p className="workspace-saved-labels">Saved human labels: <strong>{selectedEmail.effective_category} / {selectedEmail.effective_priority}</strong></p>}
                 <div className="flex items-center justify-between pb-2 border-b border-paper-border">
                   <span className="font-serif text-sm font-bold text-ink">
-                    Human Confirmation Desk
+                    Your judgment
                   </span>
                   <span className="text-[10px] font-mono text-rust uppercase font-semibold">
                     {selectedEmail.status === 'corrected' ? 'Revising Feedback' : 'Confirming Label'}
@@ -671,17 +743,19 @@ export const ReviewDesk: React.FC<ReviewDeskProps> = ({ onFeedbackSaved, status 
                 {/* Save Feedback Action Button */}
                 <div className="pt-1">
                   <button
+                    ref={saveButtonRef}
+                    data-email-id={selectedEmail.id}
                     onClick={() => handleSaveCorrection(selectedEmail.id)}
                     disabled={isSaving}
                     className="w-full py-2.5 px-4 text-xs font-sans font-semibold text-white bg-rust hover:bg-rust-hover transition-colors flex items-center justify-center gap-2 cursor-pointer shadow-paper-sm disabled:opacity-50"
                   >
                     <Check className="w-4 h-4" />
                     <span>
-                      {isSaving ? 'Saving to Feedback Ledger...' : 'Save Human Correction to Feedback Ledger'}
+                      {isSaving ? 'Saving to Feedback Ledger...' : 'Save my review'}
                     </span>
                   </button>
                   <p className="text-[10px] text-ink-faint text-center mt-1.5">
-                    Saved corrections record immutable feedback in SQLite. Candidate models are prepared in Stage 02.
+                    Your review is saved as feedback. Prepare a candidate when you’re ready to compare what changes.
                   </p>
                 </div>
               </div>
