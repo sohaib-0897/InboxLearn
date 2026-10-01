@@ -81,9 +81,21 @@ def run_browser(url, profile):
         page.on("pageerror", lambda error: errors.append(str(error)))
         page.on("request", lambda request: external.append(request.url) if not request.url.startswith(("http://127.0.0.1", "ws://127.0.0.1", "data:", "blob:")) else None)
         page.goto(url)
-        expect(page.get_by_role("heading", name="Your inbox gets smarter with every correction.", exact=True)).to_be_visible(timeout=90000)
+        expect(page.get_by_role("heading", name="Better decisions, learned together.", exact=True)).to_be_visible(timeout=90000)
         expect(page.locator("#emailList .email-item-btn")).to_have_count(3)
+        page.emulate_media(reduced_motion="reduce")
+        motion = page.evaluate("""() => ({reduced: matchMedia('(prefers-reduced-motion: reduce)').matches,
+            scroll: getComputedStyle(document.querySelector('#landing-page')).scrollBehavior,
+            orbitAnimation: getComputedStyle(document.querySelector('.orbit-one')).animationName})""")
+        assert motion == {"reduced": True, "scroll": "auto", "orbitAnimation": "none"}, motion
+        page.emulate_media(reduced_motion="no-preference")
         if profile == "mobile":
+            page.locator("#mobileNavToggle").click()
+            expect(page.locator("#mobileNavDrawer")).to_be_visible()
+            expect(page.locator("#mobileNavToggle")).to_have_attribute("aria-expanded", "true")
+            page.keyboard.press("Escape")
+            expect(page.locator("#mobileNavDrawer")).to_be_hidden()
+            expect(page.locator("#mobileNavToggle")).to_have_attribute("aria-expanded", "false")
             page.locator("#mobileNavToggle").click()
             expect(page.locator("#mobileNavDrawer")).to_be_visible()
             page.locator("#mobileNavToggle").click()

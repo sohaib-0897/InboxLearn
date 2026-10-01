@@ -90,8 +90,10 @@
   if (mobileToggle && mobileDrawer) {
     mobileToggle.addEventListener('click', function () {
       const isExpanded = mobileToggle.getAttribute('aria-expanded') === 'true';
-      mobileToggle.setAttribute('aria-expanded', !isExpanded);
-      mobileDrawer.classList.toggle('is-open');
+      const open = !isExpanded;
+      mobileToggle.setAttribute('aria-expanded', String(open));
+      mobileToggle.setAttribute('aria-label', open ? 'Close navigation' : 'Open navigation');
+      mobileDrawer.hidden = !open;
     });
 
     // Close on navigation link click
@@ -99,15 +101,17 @@
     drawerLinks.forEach(link => {
       link.addEventListener('click', () => {
         mobileToggle.setAttribute('aria-expanded', 'false');
-        mobileDrawer.classList.remove('is-open');
+        mobileToggle.setAttribute('aria-label', 'Open navigation');
+        mobileDrawer.hidden = true;
       });
     });
 
     // Close on Escape key
     document.addEventListener('keydown', function (e) {
-      if (e.key === 'Escape' && mobileDrawer.classList.contains('is-open')) {
+      if (e.key === 'Escape' && !mobileDrawer.hidden) {
         mobileToggle.setAttribute('aria-expanded', 'false');
-        mobileDrawer.classList.remove('is-open');
+        mobileToggle.setAttribute('aria-label', 'Open navigation');
+        mobileDrawer.hidden = true;
         mobileToggle.focus();
       }
     });
@@ -124,7 +128,7 @@
       const buttons = emailListEl.querySelectorAll('.email-item-btn');
       buttons.forEach((btn, idx) => {
         btn.classList.toggle('is-active', idx === index);
-        btn.setAttribute('aria-selected', idx === index ? 'true' : 'false');
+        btn.setAttribute('aria-pressed', idx === index ? 'true' : 'false');
       });
     }
 
@@ -173,8 +177,7 @@
       const li = document.createElement('li');
       const button = makeElement('button', `email-item-btn ${idx === 0 ? 'is-active' : ''}`);
       button.type = 'button';
-      button.setAttribute('role', 'tab');
-      button.setAttribute('aria-selected', idx === 0 ? 'true' : 'false');
+      button.setAttribute('aria-pressed', idx === 0 ? 'true' : 'false');
       const header = makeElement('div', 'email-item-header');
       header.append(makeElement('span', '', `#0${email.id}`), makeElement('span', '', email.date));
       const tags = makeElement('div');

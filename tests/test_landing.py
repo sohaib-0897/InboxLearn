@@ -25,11 +25,15 @@ def test_landing_renders_before_opening_a_workspace(tmp_path, monkeypatch, view)
     assert not app.exception
     assert not app.tabs
     document = app.get("html")[0].proto.body
-    assert "Your inbox gets smarter with every correction." in document
+    assert "Better decisions," in document
     assert 'href="?view=workspace" target="_self"' in document
     assert "http://localhost:8501" not in document
     assert 'href="../' not in document
     assert "PREVIEW ONLY" in document
+    assert "A prediction by itself is never treated as a training label." in document
+    assert "evaluate it before activation" in document
+    assert "Earlier versions can be restored." in document
+    assert "synthetic messages" in document
     assert not database.exists()
 
 
