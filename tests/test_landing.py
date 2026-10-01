@@ -25,15 +25,20 @@ def test_landing_renders_before_opening_a_workspace(tmp_path, monkeypatch, view)
     assert not app.exception
     assert not app.tabs
     document = app.get("html")[0].proto.body
-    assert "Better decisions," in document
+    assert "Make room for" in document
+    assert "the important." in document
+    assert "hero-shader" in document
     assert 'href="?view=workspace" target="_self"' in document
     assert "http://localhost:8501" not in document
     assert 'href="../' not in document
     assert "PREVIEW ONLY" in document
-    assert "A prediction by itself is never treated as a training label." in document
-    assert "evaluate it before activation" in document
-    assert "Earlier versions can be restored." in document
+    assert "Only saved human feedback can train a candidate." in document
+    assert "held-out evaluation before choosing to activate" in document
+    assert "Earlier versions remain available" in document
     assert "synthetic messages" in document
+    for workflow_step in ("Bring in a message", "Let the model sort", "Read and correct",
+                          "Prepare a comparison", "Check before activation", "Restore when needed"):
+        assert workflow_step in document
     assert not database.exists()
 
 

@@ -597,3 +597,39 @@ When asked to continue:
 - API: `http://127.0.0.1:8080`, PID 37184, virtualenv launcher parent 44700, session 89216, repository root: `.\.venv\Scripts\python.exe scripts/serve_api.py 8080`. Process-scoped `INBOXLEARN_DB=C:\Users\Sohaib\AppData\Local\Temp\inboxlearn-design-56a26a4523a84c7ab51d0fad3070ea96.sqlite3`. Final QA state: seven synthetic messages, two feedback records, baseline v1 active after rollback, no candidate. User database untouched.
 - To restart an isolated API, set `$env:INBOXLEARN_DB = Join-Path $env:TEMP ('inboxlearn-review-' + [guid]::NewGuid().ToString('N') + '.sqlite3')` before the API command. Recheck port ownership first. Existing proxy remains `/api` to 127.0.0.1:8080. Servers are left available while tool sessions remain alive.
 - Limitations: Edge with emulated mobile viewports only; no physical phone, second browser, screen-reader session, field performance/thermal measurement, or actual background-tab scheduling test. Hidden visibility was simulated explicitly. Solid-background contrast checking does not certify every animated shader frame. No automatic WebGL restoration is expected; the static fallback remains until remount. No remaining reproduced functional blocker. Review the running frontend; deployment remains a separate task.
+
+## Streamlit landing and workspace visual port (2026-10-02)
+
+### Deployment target and scope
+
+- The repository entry point is root `app.py`; it renders the landing page at `/` and the native workspace at `/?view=workspace`. This matches the user's Streamlit Community Cloud report that the hosted app runs `app.py`.
+- The checked-out branch is `main`, tracking `origin/main`, at `c382431` (`feat(ui): polish React InboxLearn experience`). `.github/workflows/ci.yml` also targets `main`. No Cloud dashboard configuration is present in this checkout, so the live app's dashboard branch/entrypoint values could not be independently inspected; verify the deployment after review and publication.
+- Kept all changes in Streamlit's actual assets and native renderers. React, FastAPI, service/API contracts, Python dependencies, query-parameter routing, and the separate React routes were left intact.
+
+### Changes
+
+- Reworked the Streamlit-served landing hero into a full-viewport, text-centered warm gradient with a slowly shifting radial shader texture, concise supporting copy, and clear workspace CTA. The former sample-email hero treatment is hidden; the interactive synthetic message review stays below the fold.
+- Replaced the compressed workflow explanation with six responsive steps: import, classify, review/correct, prepare a candidate, evaluate before activation, and restore an earlier version. Retained the synthetic preview, model safeguards, mobile navigation, and all `?view=workspace` links.
+- Refined the native Streamlit workspace's status, selected-message, and hover feedback using its existing parchment/ink/rust design system. All Streamlit controls and service-backed operations remain in place.
+- Reduced-motion users receive a static shader and workflow. No library or dependency was added.
+
+### Files changed
+
+- `landing/index.html` and `landing/styles.css` - Streamlit landing content, responsive gradient hero, and workflow presentation.
+- `assets/newsprint.css` - native workspace interaction and selection polish.
+- `tests/test_landing.py` and `scripts/browser_qa.py` - current landing content assertions and browser heading selector.
+- `handoff.md` - this implementation and verification record.
+
+### Verification
+
+- `python -m py_compile app.py inboxlearn/presentation.py inboxlearn/landing.py scripts/browser_qa.py` - passed.
+- `python scripts/browser_qa.py` - passed in Chromium 154 at 1440 x 1000 and 390 x 844, using disposable SQLite databases and synthetic fixtures. It exercised import/classification, review corrections, follow-up lifecycle, candidate preparation, prediction preview, held-out evaluation, activation, rollback/reactivation, and landing preview correction. No page errors or external requests.
+- Browser measurements found no horizontal overflow at 1440, 768, 390, or 320 px. The browser QA also checked reduced motion, focus visibility, landing/workspace navigation, and the interactive synthetic preview.
+- Inspected desktop/mobile landing, inbox, and review captures from `%TEMP%/inboxlearn-streamlit-port/`; screenshots and databases were kept outside the repository. The desktop landing shows the centered text hero; mobile layouts remain within the viewport.
+- Full `python -m pytest -q` - 157 passed with one existing Starlette `TestClient`/`httpx` deprecation warning. The earlier run failed only because three landing assertions still expected the pre-redesign copy; the assertions were updated and the complete rerun passed.
+- No commit or push was made. Existing untracked `refs/` and `revamp.md` were preserved.
+
+### Run and deployment notes
+
+- Local Streamlit: `streamlit run app.py`; open `http://localhost:8501/` for the landing page and `http://localhost:8501/?view=workspace` for the workspace.
+- The hosted `.streamlit.app` must deploy the reviewed `main` change to pick up these root Streamlit assets. The React frontend's `/` and `/app` are separate and do not control the Streamlit deployment.
