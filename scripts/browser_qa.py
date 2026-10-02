@@ -63,7 +63,11 @@ def choose(page, control, value):
             control.click()
             control.fill(value)
             page.get_by_role("option", name=value, exact=True).click(timeout=5000)
-            expect(control).to_have_attribute("aria-label", re.compile(re.escape(value)))
+            # Streamlit <=1.57 names the selection in aria-label; 1.63 exposes it as the input value.
+            try:
+                expect(control).to_have_attribute("aria-label", re.compile(re.escape(value)), timeout=2000)
+            except AssertionError:
+                expect(control).to_have_value(value)
             return
         except PlaywrightTimeoutError:
             if attempt == 2:
@@ -81,13 +85,15 @@ def run_browser(url, profile):
         page.on("pageerror", lambda error: errors.append(str(error)))
         page.on("request", lambda request: external.append(request.url) if not request.url.startswith(("http://127.0.0.1", "ws://127.0.0.1", "data:", "blob:")) else None)
         page.goto(url)
-        expect(page.get_by_role("heading", name="Make room for the important.", exact=True)).to_be_visible(timeout=90000)
+        expect(page.get_by_role("heading", name="An inbox that learns from you.", exact=True)).to_be_visible(timeout=90000)
         expect(page.locator("#emailList .email-item-btn")).to_have_count(3)
         page.emulate_media(reduced_motion="reduce")
+        page.wait_for_timeout(100)
         motion = page.evaluate("""() => ({reduced: matchMedia('(prefers-reduced-motion: reduce)').matches,
             scroll: getComputedStyle(document.querySelector('#landing-page')).scrollBehavior,
-            orbitAnimation: getComputedStyle(document.querySelector('.orbit-one')).animationName})""")
-        assert motion == {"reduced": True, "scroll": "auto", "orbitAnimation": "none"}, motion
+            heroAnimation: getComputedStyle(document.querySelector('.hero-copy h1')).animationName,
+            shader: ['static', 'fallback'].includes(document.querySelector('#heroShader').dataset.state) ? 'still' : 'moving'})""")
+        assert motion == {"reduced": True, "scroll": "auto", "heroAnimation": "none", "shader": "still"}, motion
         page.emulate_media(reduced_motion="no-preference")
         if profile == "mobile":
             page.locator("#mobileNavToggle").click()
@@ -104,9 +110,11 @@ def run_browser(url, profile):
         page.screenshot(path=str(OUT / f"{profile}-landing.png"), full_page=True)
         page.locator("#emailList .email-item-btn").nth(1).click()
         expect(page.locator("#detailSubject")).to_have_text("Rent invoice available")
+        page.locator("label[for=changeLabelsSwitch]").click()
+        expect(page.locator("#correctionCategory")).to_be_enabled()
         page.locator("#btnSaveCorrection").click()
         expect(page.locator("#consoleStatusMsg")).to_contain_text("PREVIEW ONLY")
-        page.locator(".hero-actions a", has_text="Open InboxLearn").click()
+        page.locator(".hero-actions a", has_text="Open your review desk").click()
         expect(page).to_have_url(url + "/?view=workspace")
         expect(page.get_by_role("heading", name="InboxLearn", exact=True)).to_be_visible()
         settled(page)
