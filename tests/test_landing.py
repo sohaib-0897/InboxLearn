@@ -25,9 +25,11 @@ def test_landing_renders_before_opening_a_workspace(tmp_path, monkeypatch, view)
     assert not app.exception
     assert not app.tabs
     document = app.get("html")[0].proto.body
-    assert "Make room for" in document
-    assert "the important." in document
+    assert "An inbox that learns" in document
+    assert "from you." in document
+    assert "Open your review desk" in document
     assert "hero-shader" in document
+    assert 'role="switch"' in document
     assert 'href="?view=workspace" target="_self"' in document
     assert "http://localhost:8501" not in document
     assert 'href="../' not in document
@@ -40,6 +42,15 @@ def test_landing_renders_before_opening_a_workspace(tmp_path, monkeypatch, view)
                           "Prepare a comparison", "Check before activation", "Restore when needed"):
         assert workflow_step in document
     assert not database.exists()
+
+
+def test_landing_script_survives_streamlit_html_sanitizer():
+    # st.html runs DOMPurify, which removes a <script> whose text contains "<"
+    # directly followed by a word character, "/" or "!" (mXSS guard).
+    import re
+    script = (APP.parent / "landing" / "script.js").read_text(encoding="utf-8")
+    assert not re.search(r"<[/\w!]", script)
+    assert "<svg" not in (APP.parent / "landing" / "index.html").read_text(encoding="utf-8")
 
 
 def test_workspace_can_return_to_landing_and_reopen(tmp_path, monkeypatch):
